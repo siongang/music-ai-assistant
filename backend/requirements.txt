@@ -1,0 +1,17 @@
+numpy==1.26.4
+soundfile==0.12.1
+ffmpeg
+ffmpeg-python
+fastapi
+uvicorn[standard]
+requests
+
+# demucs
+# please make sure you have already a pytorch install that is cuda enabled!
+dora-search
+einops
+julius>=0.2.3
+lameenc>=1.2
+openunmix
+pyyaml
+tqdm

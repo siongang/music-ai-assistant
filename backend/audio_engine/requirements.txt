@@ -1,0 +1,8 @@
+torch==2.1.0+cu118
+torchaudio==2.1.0+cu118
+numpy==1.26.4
+
+demucs @ git+https://github.com/facebookresearch/demucs.git@e976d93ecc3865e5757426930257e200846a520a
+
+soundfile==0.12.1
+ffmpeg-python

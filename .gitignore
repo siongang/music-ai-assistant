@@ -83,17 +83,18 @@ dump.rdb
 
 # Generated audio outputs
 outputs/
-stems/
 midi/
 renders/
 tmp/
 temp/
 uploads/
+tmp/**/stems/
+/stems/
 
 # ===============================
 # ML / Audio Models
 # ===============================
-models/
+/models/
 checkpoints/
 weights/
 *.pt
@@ -102,7 +103,7 @@ weights/
 
 # Demucs / ML caches
 .dora/
-.demucs/
+# .demucs/
 .torch/
 .cache/torch/
 .cache/huggingface/
