@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from ..storage.local_storage import LocalStorage
-from .stem_service import StemService 
+from app.storage.local_storage import LocalStorage
+from app.services.stem_service import StemService 
 from demucs.audio import save_audio
 
 

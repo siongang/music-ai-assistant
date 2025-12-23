@@ -1,5 +1,5 @@
 from pathlib import Path
-from ..audio_engine.stems.demucs_separator import DemucsSeparator
+from app.audio_engine.stems.demucs_separator import DemucsSeparator
 
 
 class StemService():
