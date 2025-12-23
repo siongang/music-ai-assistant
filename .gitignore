@@ -1,0 +1,142 @@
+# ===============================
+# OS / Editor
+# ===============================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*.log
+
+# ===============================
+# Environment / Secrets
+# ===============================
+.env
+.env.*
+!.env.example
+
+# ===============================
+# Python
+# ===============================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ===============================
+# Node / Frontend
+# ===============================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+.next/
+out/
+dist/
+.cache/
+
+# ===============================
+# FastAPI / Backend
+# ===============================
+*.sqlite3
+*.db
+*.db-journal
+
+# ===============================
+# Celery / Redis
+# ===============================
+celerybeat-schedule
+celerybeat.pid
+dump.rdb
+
+# ===============================
+# Audio / Media Artifacts
+# ===============================
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.aiff
+*.m4a
+
+# Generated audio outputs
+outputs/
+stems/
+midi/
+renders/
+tmp/
+temp/
+uploads/
+
+# ===============================
+# ML / Audio Models
+# ===============================
+models/
+checkpoints/
+weights/
+*.pt
+*.pth
+*.onnx
+
+# Demucs / ML caches
+.dora/
+.demucs/
+.torch/
+.cache/torch/
+.cache/huggingface/
+
+# ===============================
+# Docker
+# ===============================
+docker-data/
+*.pid
+
+# ===============================
+# Logs
+# ===============================
+logs/
+*.log
+
+# ===============================
+# Testing / Scratch
+# ===============================
+scratch/
+experiments/
+notebooks/.ipynb_checkpoints/
+
+# ===============================
+# Deployment / Infra
+# ===============================
+terraform/.terraform/
+terraform/*.tfstate*
+infra/secrets/
+
+# ===============================
+# Misc
+# ===============================
+*.zip
+*.tar.gz
+*.bak
+*.tmp
