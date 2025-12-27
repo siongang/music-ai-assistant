@@ -8,6 +8,7 @@ requests
 sqlalchemy
 psycopg2-binary
 pydantic
+python-multipart
 
 # demucs
 # please make sure you have already a pytorch install that is cuda enabled!
