@@ -11,7 +11,11 @@ pydantic
 python-multipart
 
 # demucs
-# please make sure you have already a pytorch install that is cuda enabled!
+# IMPORTANT: PyTorch must be installed separately BEFORE installing other packages!
+# Choose one:
+#   CUDA (GPU): pip install torch==2.1.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu118
+#   CPU:        pip install torch==2.1.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+# See WSL_MIGRATION.md for detailed instructions
 dora-search
 einops
 julius>=0.2.3
@@ -19,3 +23,10 @@ lameenc>=1.2
 openunmix
 pyyaml
 tqdm
+
+basic-pitch
+
+
+# db
+redis
+celery

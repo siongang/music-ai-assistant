@@ -122,6 +122,12 @@ Invoke-RestMethod -Uri "http://localhost:8000/api/jobs" `
   -ContentType "multipart/form-data"
 ```
 
+**Linux/WSL (Ubuntu):**
+```bash
+curl -X POST "http://localhost:8000/api/jobs" \
+  -F "file=@/path/to/your/audio.mp3"
+```
+
 **Using Python requests:**
 ```python
 import requests
@@ -183,10 +189,10 @@ Expected responses:
 Check that stems were created:
 
 ```bash
-# Linux/macOS
+# Linux/macOS/WSL
 ls -la backend/tmp/jobs/{job_id}/stems/
 
-# Windows
+# Windows (PowerShell)
 dir backend\tmp\jobs\{job_id}\stems\
 ```
 

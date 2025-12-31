@@ -38,6 +38,7 @@ ffmpeg -version
 
 If not installed:
 - **Windows**: Download from https://ffmpeg.org/download.html and add to PATH
+- **WSL/Ubuntu**: `sudo apt-get install ffmpeg`
 - **macOS**: `brew install ffmpeg`
 - **Linux**: `sudo apt-get install ffmpeg`
 

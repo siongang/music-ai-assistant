@@ -63,15 +63,35 @@ uvicorn app.main:app --reload
 
 If you don't know your PostgreSQL password, you can:
 
-1. **Reset password:**
+1. **Reset password (Linux/WSL/Ubuntu):**
 ```bash
-# Windows (run as admin)
+# Stop PostgreSQL service
+sudo systemctl stop postgresql
+
+# Edit pg_hba.conf to use trust authentication temporarily
+sudo nano /etc/postgresql/*/main/pg_hba.conf
+# Change 'md5' to 'trust' for local connections
+
+# Restart PostgreSQL
+sudo systemctl start postgresql
+
+# Connect and reset password
+psql -U postgres
+ALTER USER postgres PASSWORD 'your_new_password';
+
+# Restore pg_hba.conf to use 'md5' again
+sudo nano /etc/postgresql/*/main/pg_hba.conf
+sudo systemctl restart postgresql
+```
+
+2. **Windows (run as admin):**
+```bash
 net stop postgresql-x64-XX
 # Edit pg_hba.conf to use trust authentication temporarily
 # Then reset password
 ```
 
-2. **Or use postgres user with no password** (if configured):
+3. **Or use postgres user with no password** (if configured):
 ```python
 DATABASE_URL = "postgresql://postgres@localhost:5432/music"
 ```

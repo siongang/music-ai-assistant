@@ -16,7 +16,8 @@ FastAPI backend for audio processing and stem separation using Demucs.
 - **Python 3.10+**
 - **PostgreSQL** database (or SQLite for quick testing)
 - **FFmpeg** installed and in PATH
-- **CUDA-enabled PyTorch** (for GPU acceleration, optional)
+- **PyTorch** (CUDA-enabled recommended for GPU acceleration, or CPU-only)
+  - See [PYTORCH_SETUP.md](./PYTORCH_SETUP.md) for installation instructions
 
 ### Installation
 
@@ -53,6 +54,7 @@ ffmpeg -version
 
 If not installed:
 - **Windows**: Download from https://ffmpeg.org/download.html and add to PATH
+- **WSL/Ubuntu**: `sudo apt-get install ffmpeg`
 - **macOS**: `brew install ffmpeg`
 - **Linux**: `sudo apt-get install ffmpeg`
 
