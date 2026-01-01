@@ -62,11 +62,13 @@ Returns JobResponse
 ### 2. Job Processing Flow
 
 ```
-AudioJobWorker.poll_and_process()
+POST /api/jobs (creates job, saves file)
   ↓
-JobService.get_pending_jobs() → Database (queries pending jobs)
+process_audio_job.delay(job_id) → Redis Queue (enqueues Celery task)
   ↓
-AudioJobWorker.process_job()
+Celery Worker (picks up task from Redis)
+  ↓
+process_audio_job task (app/tasks/job_tasks.py)
   ↓
 JobService.update_job_status("processing") → Database
   ↓
@@ -82,6 +84,8 @@ demucs.audio.save_audio() → Filesystem (saves stems)
   ↓
 JobService.update_job_status("completed") → Database
 ```
+
+**Note:** The old polling worker (`AudioJobWorker`) has been replaced with Celery tasks. Tasks are automatically retried on transient errors and are not lost if a worker crashes.
 
 **File Paths:**
 - Input: `backend/tmp/jobs/{job_id}/input/{filename}`
@@ -152,17 +156,28 @@ Returns JobResponse
 - `DemucsSeparator`: Wrapper around Demucs library
 - `StemService`: High-level interface for separation
 
-### Workers (`workers/`)
+### Tasks (`tasks/`) - Current Implementation
 
-- **Purpose**: Background job processing
+- **Purpose**: Asynchronous job processing via Celery
 - **Responsibilities**:
-  - Poll for pending jobs
-  - Process jobs asynchronously
+  - Process jobs from Redis queue
+  - Handle task retries and error recovery
   - Update job status
 
 **Key Components:**
-- `AudioJobWorker`: Main worker that processes jobs
-- `fetch_input`: Utility for fetching input files (future use)
+- `process_audio_job`: Celery task that processes audio jobs
+- Automatic retries for transient errors
+- Late acknowledgment to prevent task loss
+
+**Configuration:**
+- See `app/celery_app.py` for Celery configuration
+- See `app/tasks/README.md` for detailed documentation
+
+### Workers (`workers/`) - Deprecated
+
+- **Purpose**: Legacy background job processing (deprecated)
+- **Status**: Replaced by Celery tasks in `app/tasks/`
+- **Note**: Kept for reference only. Jobs are now processed via Celery.
 
 ### Database Layer (`db/`, `models/`)
 

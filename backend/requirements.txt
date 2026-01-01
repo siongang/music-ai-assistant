@@ -16,6 +16,8 @@ python-multipart
 #   CUDA (GPU): pip install torch==2.1.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu118
 #   CPU:        pip install torch==2.1.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cpu
 # See WSL_MIGRATION.md for detailed instructions
+# After PyTorch, install demucs from git:
+demucs @ git+https://github.com/facebookresearch/demucs.git@e976d93ecc3865e5757426930257e200846a520a
 dora-search
 einops
 julius>=0.2.3

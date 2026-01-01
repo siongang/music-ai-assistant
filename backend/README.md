@@ -7,7 +7,7 @@ FastAPI backend for audio processing and stem separation using Demucs.
 - **Audio Upload**: Upload audio files via REST API
 - **Stem Separation**: Automatically separate audio into stems (vocals, drums, bass, other)
 - **Job Management**: Track job status and processing progress
-- **Background Processing**: Asynchronous job processing via worker
+- **Background Processing**: Asynchronous job processing via Celery and Redis
 
 ## Quick Start
 
@@ -15,6 +15,7 @@ FastAPI backend for audio processing and stem separation using Demucs.
 
 - **Python 3.10+**
 - **PostgreSQL** database (or SQLite for quick testing)
+- **Redis** for job queue (required for Celery)
 - **FFmpeg** installed and in PATH
 - **PyTorch** (CUDA-enabled recommended for GPU acceleration, or CPU-only)
   - See [PYTORCH_SETUP.md](./PYTORCH_SETUP.md) for installation instructions
@@ -74,21 +75,39 @@ API will be available at:
 - **Swagger Docs**: http://localhost:8000/docs
 - **Health Check**: http://localhost:8000/api/health
 
-#### Terminal 2: Start the Worker
+#### Terminal 2: Start Redis (if not already running)
+
+```bash
+# Linux/WSL
+sudo service redis-server start
+
+# macOS
+brew services start redis
+
+# Verify Redis is running
+redis-cli ping  # Should return: PONG
+```
+
+#### Terminal 3: Start the Celery Worker
 
 ```bash
 cd backend
-python -m app.workers.audio_job_worker
+./start_celery_worker.sh
+# or manually:
+celery -A app.celery_app worker --loglevel=info
 ```
 
-The worker will:
-- Poll the database every 5 seconds for pending jobs
-- Process jobs automatically
+The Celery worker will:
+- Process jobs from the Redis queue automatically
+- Retry failed tasks for transient errors
 - Update job status in the database
+- Handle worker crashes gracefully (tasks are re-queued)
+
+See [CELERY_SETUP.md](./CELERY_SETUP.md) for detailed Celery configuration.
 
 ### Quick Test
 
-1. **Start both the API server and worker** (see above - two terminals)
+1. **Start Redis, API server, and Celery worker** (see above - three terminals)
 2. **Test with the automated script:**
 ```bash
 python test_api.py path/to/your/audio.mp3
@@ -160,7 +179,8 @@ backend/app/
 ├── schemas/         # Pydantic schemas (see app/schemas/README.md)
 ├── services/        # Business logic (see app/services/README.md)
 ├── storage/         # File storage (see app/storage/README.md)
-└── workers/         # Background workers (see app/workers/README.md)
+├── tasks/           # Celery tasks (see app/tasks/README.md)
+└── workers/         # Legacy workers (deprecated - see app/workers/README.md)
 ```
 
 **Quick Reference:**
@@ -169,13 +189,17 @@ backend/app/
 - [Services Layer](./app/services/README.md) - Business logic
 - [Storage Layer](./app/storage/README.md) - File storage
 - [Audio Engine](./app/audio_engine/README.md) - Audio processing
-- [Workers](./app/workers/README.md) - Background processing
+- [Celery Tasks](./app/tasks/README.md) - Background processing (current)
+- [Workers](./app/workers/README.md) - Legacy workers (deprecated)
 
 ## Data Flow
 
 1. **Upload**: Client uploads audio file → Saved to `backend/tmp/jobs/{job_id}/input/`
-2. **Process**: Worker picks up job → Separates audio → Saves stems to `backend/tmp/jobs/{job_id}/stems/`
-3. **Status**: Client queries job status → Returns current status
+2. **Enqueue**: Job is enqueued to Redis via Celery → Task added to queue
+3. **Process**: Celery worker picks up task → Separates audio → Saves stems to `backend/tmp/jobs/{job_id}/stems/`
+4. **Status**: Client queries job status → Returns current status
+
+See [CELERY_SETUP.md](./CELERY_SETUP.md) for detailed architecture.
 
 ## Configuration
 
@@ -185,10 +209,15 @@ The application uses environment variables for configuration (useful for cloud d
 
 - `DATABASE_URL`: Database connection string (defaults to PostgreSQL local)
 - `STORAGE_ROOT`: Root directory for file storage (defaults to `backend/tmp`)
+- `REDIS_HOST`: Redis host (default: `localhost`)
+- `REDIS_PORT`: Redis port (default: `6379`)
+- `REDIS_DB`: Redis database number (default: `0`)
+- `REDIS_PASSWORD`: Redis password (optional, for production)
 
 Set these in your environment or modify defaults in:
 - `app/db/session.py` - Database connection
 - `app/core/constants.py` - Storage paths
+- `app/celery_app.py` - Redis/Celery configuration
 
 ### Constants
 
@@ -230,10 +259,13 @@ pytest
 
 ### Worker not processing jobs
 
-- Check database connection
-- Verify worker is running
-- Check logs for errors
+- Check Redis is running: `redis-cli ping` (should return `PONG`)
+- Verify Celery worker is running and connected to Redis
+- Check worker logs for errors
 - Ensure input file exists in job directory
+- Verify task is enqueued (check Redis queue)
+
+See [CELERY_SETUP.md](./CELERY_SETUP.md) for detailed troubleshooting.
 
 ### Separation fails
 

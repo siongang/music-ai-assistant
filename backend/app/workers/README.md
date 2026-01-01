@@ -1,8 +1,20 @@
-# Background Workers
+# Background Workers (Deprecated)
 
-## Purpose
+## ⚠️ Status: Deprecated
+
+**This worker implementation has been replaced with Celery and Redis.**
+
+The application now uses Celery tasks (`app/tasks/`) for asynchronous job processing. This provides better reliability, scalability, and error handling.
+
+**Current Implementation:** See [app/tasks/README.md](../tasks/README.md) for the current Celery-based implementation.
+
+**Migration:** The old `AudioJobWorker` is kept for reference only. Jobs are now processed via Celery workers.
+
+## Purpose (Legacy)
 
 Background processes that handle asynchronous job processing. Workers poll the database for pending jobs and process them.
+
+**Note:** This approach has been replaced with Celery for better reliability and scalability.
 
 ## Key Components
 

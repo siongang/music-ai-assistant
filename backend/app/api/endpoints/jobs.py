@@ -16,6 +16,7 @@ from app.services.job_service import JobService
 from app.storage.local_storage import LocalStorage
 from app.schemas.job import JobResponse
 from app.core.constants import STORAGE_ROOT
+from app.tasks.job_tasks import process_audio_job
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,21 @@ def create_job(
             filename=file.filename
         )
         logger.info(f"File saved for job {job_id}: {file_path}")
+        
+        # Enqueue job for processing with Celery
+        try:
+            process_audio_job.delay(str(job_id))
+            logger.info(f"Job {job_id} enqueued for processing")
+        except Exception as e:
+            # Log error but don't fail the request - job is created and file is saved
+            # Job will remain in "pending" status and can be manually retried or processed later
+            logger.error(
+                f"Failed to enqueue job {job_id} for processing: {e}",
+                exc_info=True
+            )
+            # Note: We don't update job status here because the job is valid,
+            # just the queue system is temporarily unavailable
+        
         return JobResponse.model_validate(job)
     except Exception as e:
         # Update job status to failed if file save fails

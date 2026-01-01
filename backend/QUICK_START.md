@@ -42,9 +42,32 @@ If not installed:
 - **macOS**: `brew install ffmpeg`
 - **Linux**: `sudo apt-get install ffmpeg`
 
-### 4. Run the Application
+### 4. Start Redis
 
-**You need TWO terminals open:**
+**Linux/WSL:**
+```bash
+sudo service redis-server start
+```
+
+**macOS:**
+```bash
+brew services start redis
+```
+
+**Docker:**
+```bash
+docker run -d -p 6379:6379 redis
+```
+
+**Verify Redis is running:**
+```bash
+redis-cli ping
+# Should return: PONG
+```
+
+### 5. Run the Application
+
+**You need THREE terminals open:**
 
 #### Terminal 1: API Server
 
@@ -59,20 +82,30 @@ INFO:     Uvicorn running on http://127.0.0.1:8000
 INFO:     Application startup complete.
 ```
 
-#### Terminal 2: Worker
+#### Terminal 2: Celery Worker
 
 ```bash
 cd backend
-python -m app.workers.audio_job_worker
+./start_celery_worker.sh
+# or manually:
+celery -A app.celery_app worker --loglevel=info
 ```
 
 You should see:
 ```
-INFO:     AudioJobWorker initialized
-INFO:     Worker started. Polling every 5 seconds...
+[INFO] celery@hostname ready.
 ```
 
-### 5. Test It
+#### Terminal 3: (Optional) Monitor with Flower
+
+```bash
+pip install flower
+celery -A app.celery_app flower
+```
+
+Visit `http://localhost:5555` to monitor workers and tasks.
+
+### 6. Test It
 
 **Option A: Use Swagger UI**
 1. Open http://localhost:8000/docs
@@ -121,10 +154,11 @@ curl "http://localhost:8000/api/jobs/{job_id}"
 - Make sure PostgreSQL service is running
 
 **Worker not processing?**
-- Make sure API server is running first
-- Check database connection
+- Make sure Redis is running: `redis-cli ping`
+- Check Celery worker is running and connected to Redis
 - Look for errors in worker terminal
 - Verify input file exists in `backend/tmp/jobs/{job_id}/input/`
+- Check if task is enqueued: `redis-cli LLEN celery`
 
 **Separation fails?**
 - Verify FFmpeg: `ffmpeg -version`
@@ -135,7 +169,8 @@ curl "http://localhost:8000/api/jobs/{job_id}"
 ## What's Running?
 
 - **API Server**: http://localhost:8000 (handles HTTP requests)
-- **Worker**: Background process (processes jobs every 5 seconds)
+- **Redis**: Message broker (queues tasks for processing)
+- **Celery Worker**: Background process (processes jobs from Redis queue)
 - **Database**: Local PostgreSQL (stores job status) - or SQLite
 - **Storage**: `backend/tmp/` directory (stores audio files)
 

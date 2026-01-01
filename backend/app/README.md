@@ -16,7 +16,9 @@ app/
 ├── schemas/         # Pydantic request/response schemas
 ├── services/        # Business logic services
 ├── storage/         # Storage abstraction layer
-├── workers/         # Background job processing workers
+├── tasks/           # Celery tasks for background processing (current)
+├── workers/         # Legacy workers (deprecated)
+├── celery_app.py    # Celery application configuration
 └── main.py          # FastAPI application entry point
 ```
 
@@ -27,7 +29,8 @@ app/
 3. **Storage Layer** (`storage/`): File storage abstraction
 4. **Audio Engine** (`audio_engine/`): Audio processing (Demucs)
 5. **Database Layer** (`db/`, `models/`): Data persistence
-6. **Worker Layer** (`workers/`): Background job processing
+6. **Task Layer** (`tasks/`): Celery tasks for asynchronous job processing (current)
+7. **Worker Layer** (`workers/`): Legacy workers (deprecated)
 
 ## Data Flow
 
@@ -38,10 +41,16 @@ API Endpoint (api/)
   ↓
 Service Layer (services/)
   ↓
+Celery Task (tasks/) - enqueued to Redis
+  ↓
+Celery Worker (processes task)
+  ↓
 Storage / Audio Engine / Database
   ↓
-Response
+Response / Job Status Update
 ```
+
+See [CELERY_SETUP.md](../CELERY_SETUP.md) for detailed Celery architecture.
 
 ## Key Principles
 
