@@ -23,12 +23,15 @@ backend/app/
 │   ├── base.py           # SQLAlchemy base class
 │   └── session.py        # Database session management
 ├── models/                # SQLAlchemy database models
-│   └── job.py            # Job model
+│   ├── job.py            # Job model
+│   └── audio.py          # Audio model
 ├── schemas/               # Pydantic schemas for API
-│   └── job.py            # Job request/response schemas
+│   ├── job.py            # Job request/response schemas
+│   └── audio.py          # Audio request/response schemas
 ├── services/              # Business logic services
 │   ├── job_service.py    # Job database operations
-│   ├── pipeline_runner_service.py  # Pipeline orchestration
+│   ├── audio_service.py  # Audio database operations
+│   ├── pipeline_runner_service.py  # Audio processing orchestration
 │   └── stem_service.py   # Stem separation service
 ├── storage/               # Storage abstraction
 │   ├── base.py           # Storage interface
@@ -41,57 +44,79 @@ backend/app/
 
 ## Data Flow
 
-### 1. Job Creation Flow
+### 1. Audio Upload Flow (Synchronous)
+
+```
+Client Request (POST /api/audio)
+  ↓
+audio.py::upload_audio()
+  ↓
+LocalStorage.save_audio_file() → Filesystem (saves to audio/{audio_id}/)
+  ↓
+AudioService.create_audio() → Database (creates Audio record)
+  ↓
+Returns AudioResponse with audio_id
+```
+
+**File Paths:**
+- Database: `audio` table
+- Filesystem: `storage/audio/{audio_id}/{filename}`
+
+### 2. Job Creation Flow (Asynchronous)
 
 ```
 Client Request (POST /api/jobs)
   ↓
 jobs.py::create_job()
   ↓
+AudioService.get_audio_path() → Validates audio exists
+  ↓
 JobService.create_job() → Database (creates Job record)
   ↓
-LocalStorage.save_input_file() → Filesystem (saves audio file)
+process_audio_job.delay(job_id) → Redis Queue (enqueues Celery task)
   ↓
-Returns JobResponse
+Returns JobResponse with job_id and status "queued"
 ```
 
 **File Paths:**
 - Database: `jobs` table
-- Filesystem: `backend/tmp/jobs/{job_id}/input/{filename}`
+- No file operations (audio already uploaded)
 
-### 2. Job Processing Flow
+### 3. Job Processing Flow (Background)
 
 ```
-POST /api/jobs (creates job, saves file)
-  ↓
-process_audio_job.delay(job_id) → Redis Queue (enqueues Celery task)
-  ↓
 Celery Worker (picks up task from Redis)
   ↓
 process_audio_job task (app/tasks/job_tasks.py)
   ↓
-JobService.update_job_status("processing") → Database
+JobService.get_job() → Database (loads job)
   ↓
-LocalStorage.job_path() → Filesystem (gets job directory)
+AudioService.get_audio_path() → Gets audio file path
   ↓
-PipelineRunnerService.run()
+JobService.update_job_status("running") → Database
   ↓
-StemService.separate() → DemucsSeparator.separate()
+Route to processor based on job.type:
+  - stem_separation → PipelineRunnerService.process_stem_separation()
+  - melody_extraction → PipelineRunnerService.process_melody_extraction()
+  - chord_analysis → PipelineRunnerService.process_chord_analysis()
   ↓
-demucs.api.Separator.separate_audio_file() → Demucs library
+PipelineRunnerService processes audio:
+  - StemService.separate() → DemucsSeparator.separate()
+  - demucs.api.Separator.separate_audio_file() → Demucs library
+  - demucs.audio.save_audio() → Filesystem (saves stems)
   ↓
-demucs.audio.save_audio() → Filesystem (saves stems)
+Collect output file paths
   ↓
-JobService.update_job_status("completed") → Database
+JobService.update_job_status("succeeded", output={...}) → Database
 ```
 
 **Note:** The old polling worker (`AudioJobWorker`) has been replaced with Celery tasks. Tasks are automatically retried on transient errors and are not lost if a worker crashes.
 
 **File Paths:**
-- Input: `backend/tmp/jobs/{job_id}/input/{filename}`
-- Output: `backend/tmp/jobs/{job_id}/stems/{track}.{stem}.mp3`
+- Input: `storage/audio/{audio_id}/{filename}` (reused from upload)
+- Output: `storage/jobs/{job_id}/stems/{track}.{stem}.mp3`
 
-### 3. Job Status Query Flow
+### 4. Job Status Query Flow
 
 ```
 Client Request (GET /api/jobs/{job_id})
@@ -100,7 +125,9 @@ jobs.py::get_job()
   ↓
 JobService.get_job() → Database
   ↓
-Returns JobResponse
+Extract audio_id from job.input
+  ↓
+Returns JobResponse with status, progress, output
 ```
 
 ## Key Components
@@ -115,6 +142,7 @@ Returns JobResponse
   - Handle HTTP errors
 
 **Key Files:**
+- `api/endpoints/audio.py`: Audio upload endpoint
 - `api/endpoints/jobs.py`: Job CRUD operations
 - `api/health.py`: Health check endpoint
 - `api/router.py`: Aggregates all routers
@@ -128,8 +156,12 @@ Returns JobResponse
   - Handle complex operations
 
 **Key Services:**
+- `AudioService`: Database operations for audio files
 - `JobService`: Database operations for jobs
-- `PipelineRunnerService`: Orchestrates audio processing
+- `PipelineRunnerService`: Orchestrates different audio processing operations
+  - `process_stem_separation()`: Stem separation workflow
+  - `process_melody_extraction()`: Melody extraction (future)
+  - `process_chord_analysis()`: Chord analysis (future)
 - `StemService`: Wraps stem separation functionality
 
 ### Storage Layer (`storage/`)

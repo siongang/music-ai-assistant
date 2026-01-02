@@ -5,7 +5,7 @@ This module defines the Job model which represents an audio processing job
 in the database.
 """
 import uuid
-from sqlalchemy import Column, String, DateTime, Text, TypeDecorator
+from sqlalchemy import Column, String, DateTime, Text, TypeDecorator, JSON, Float
 from sqlalchemy.sql import func
 
 from app.db.base import Base
@@ -51,15 +51,24 @@ class Job(Base):
     """
     Job model representing an audio processing job.
     
-    Each job represents a single audio file processing task:
-    - pending: Job created, waiting to be processed
-    - processing: Job is currently being processed
-    - completed: Job completed successfully
+    Each job represents a single audio processing task that operates on
+    an uploaded audio file. Jobs can be of different types (stem_separation,
+    melody_extraction, chord_analysis, etc.).
+    
+    Job lifecycle:
+    - queued: Job created, waiting to be processed
+    - running: Job is currently being processed
+    - succeeded: Job completed successfully
     - failed: Job failed with an error
     
     Attributes:
         id: Unique identifier (UUID)
+        type: Job type (e.g., "stem_separation", "melody_extraction")
         status: Current job status
+        input: JSON object containing input data (e.g., {"audio_id": "..."})
+        params: JSON object containing job parameters (e.g., {"model": "demucs_v4"})
+        output: JSON object containing output data (e.g., {"vocals": "...", "drums": "..."})
+        progress: Progress value (0.0 to 1.0)
         error_message: Error message if job failed
         created_at: Timestamp when job was created
         updated_at: Timestamp when job was last updated
@@ -69,8 +78,23 @@ class Job(Base):
     # Primary key: UUID (works with both PostgreSQL and SQLite)
     id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     
-    # Job status: "pending", "processing", "completed", or "failed"
-    status = Column(String, nullable=False, default="pending")
+    # Job type: "stem_separation", "melody_extraction", "chord_analysis", etc.
+    type = Column(String, nullable=False)
+    
+    # Job status: "queued", "running", "succeeded", or "failed"
+    status = Column(String, nullable=False, default="queued")
+    
+    # Input data (JSON): e.g., {"audio_id": "audio_abc123"}
+    input = Column(JSON, nullable=False)
+    
+    # Job parameters (JSON): e.g., {"model": "demucs_v4"}
+    params = Column(JSON, nullable=True)
+    
+    # Output data (JSON): e.g., {"vocals": "path/to/vocals.wav", "drums": "path/to/drums.wav"}
+    output = Column(JSON, nullable=True)
+    
+    # Progress value (0.0 to 1.0)
+    progress = Column(Float, nullable=True, default=0.0)
     
     # Error message if job failed
     error_message = Column(Text, nullable=True)

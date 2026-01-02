@@ -23,10 +23,22 @@ DEFAULT_STEM_FORMAT = "mp3"
 # Job status values
 class JobStatus:
     """Job status constants"""
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
     FAILED = "failed"
+    
+    # Legacy aliases for backward compatibility
+    PENDING = QUEUED
+    PROCESSING = RUNNING
+    COMPLETED = SUCCEEDED
+
+# Job types
+class JobType:
+    """Job type constants"""
+    STEM_SEPARATION = "stem_separation"
+    MELODY_EXTRACTION = "melody_extraction"
+    CHORD_ANALYSIS = "chord_analysis"
 
 # Storage paths
 # Reads from environment variable, falls back to default for local development
@@ -48,5 +60,10 @@ else:
     STORAGE_ROOT = BACKEND_DIR / "tmp"
 
 JOBS_DIR = "jobs"
+AUDIO_DIR = "audio"
 INPUT_DIR = "input"
 STEMS_DIR = "stems"
+
+# File upload limits
+MAX_FILE_SIZE_MB = 500  # Maximum file size in megabytes
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024  # Convert to bytes

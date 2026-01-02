@@ -1,13 +1,15 @@
 # Music Assistant Backend
 
-FastAPI backend for audio processing and stem separation using Demucs.
+FastAPI backend for music analysis and processing. Part of the Music Assistant platform that combines audio processing with LLM-powered music understanding.
 
 ## Features
 
-- **Audio Upload**: Upload audio files via REST API
-- **Stem Separation**: Automatically separate audio into stems (vocals, drums, bass, other)
-- **Job Management**: Track job status and processing progress
+- **Audio Upload**: Upload audio files separately from job creation (upload once, use many times)
+- **Flexible Jobs**: Create different types of jobs (stem separation, melody extraction, chord analysis)
+- **Stem Separation**: Automatically separate audio into stems (vocals, drums, bass, other) using Demucs
+- **Job Management**: Track job status, progress, and results
 - **Background Processing**: Asynchronous job processing via Celery and Redis
+- **Extensible Architecture**: Easy to add new job types and processing pipelines
 
 ## Quick Start
 
@@ -40,13 +42,20 @@ pip install -r requirements.txt
    # Change username/password as needed
    ```
    
-   Tables will be created automatically on first startup.
+   **Create tables:**
+   - **Fresh install**: Run `psql -U postgres -d music -f setup_db.sql`
+   - **Existing database**: Run `psql -U postgres -d music -f migrate_db.sql` to migrate
+   - **Auto-create**: Tables will also be created automatically on first startup (development only)
    
    **Option B: SQLite (Quick Testing)**
    ```python
    # In app/db/session.py, change:
    DATABASE_URL = "sqlite:///./test.db"
    ```
+   
+   **For existing SQLite databases:**
+   - If you have an old database, run: `./migrate_sqlite.sh test.db`
+   - Or simply delete `test.db` and let the app recreate it on startup
 
 4. **Verify FFmpeg:**
 ```bash
@@ -103,8 +112,6 @@ The Celery worker will:
 - Update job status in the database
 - Handle worker crashes gracefully (tasks are re-queued)
 
-See [CELERY_SETUP.md](./CELERY_SETUP.md) for detailed Celery configuration.
-
 ### Quick Test
 
 1. **Start Redis, API server, and Celery worker** (see above - three terminals)
@@ -127,9 +134,9 @@ See [TESTING.md](./TESTING.md) for detailed testing instructions.
 GET /api/health
 ```
 
-### Create Job
+### Upload Audio
 ```
-POST /api/jobs
+POST /api/audio
 Content-Type: multipart/form-data
 
 file: <audio_file>
@@ -138,8 +145,38 @@ file: <audio_file>
 Response:
 ```json
 {
-  "id": "uuid",
-  "status": "pending",
+  "audio_id": "abc-123-def",
+  "filename": "song.mp3"
+}
+```
+
+### Create Job
+```
+POST /api/jobs
+Content-Type: application/json
+
+{
+  "type": "stem_separation",
+  "input": {
+    "audio_id": "abc-123-def"
+  },
+  "params": {
+    "model": "demucs_v4"
+  }
+}
+```
+
+Response:
+```json
+{
+  "job_id": "xyz-789",
+  "type": "stem_separation",
+  "status": "queued",
+  "audio_id": "abc-123-def",
+  "input": {"audio_id": "abc-123-def"},
+  "params": {"model": "demucs_v4"},
+  "progress": null,
+  "output": null,
   "created_at": "2024-01-01T00:00:00Z"
 }
 ```
@@ -149,16 +186,72 @@ Response:
 GET /api/jobs/{job_id}
 ```
 
-Response:
+Response (Running):
 ```json
 {
-  "id": "uuid",
-  "status": "completed",
-  "error_message": null,
-  "created_at": "2024-01-01T00:00:00Z",
-  "updated_at": "2024-01-01T00:00:01Z"
+  "job_id": "xyz-789",
+  "type": "stem_separation",
+  "status": "running",
+  "audio_id": "abc-123-def",
+  "progress": 0.42,
+  "output": null,
+  "created_at": "2024-01-01T00:00:00Z"
 }
 ```
+
+Response (Completed):
+```json
+{
+  "job_id": "xyz-789",
+  "type": "stem_separation",
+  "status": "succeeded",
+  "audio_id": "abc-123-def",
+  "progress": 1.0,
+  "output": {
+    "vocals": "jobs/xyz-789/stems/track.vocals.mp3",
+    "drums": "jobs/xyz-789/stems/track.drums.mp3",
+    "bass": "jobs/xyz-789/stems/track.bass.mp3",
+    "other": "jobs/xyz-789/stems/track.other.mp3"
+  },
+  "created_at": "2024-01-01T00:00:00Z",
+  "updated_at": "2024-01-01T00:00:30Z"
+}
+```
+
+## User Flow
+
+### 1. Upload Audio (Synchronous)
+```
+POST /api/audio → Returns audio_id
+```
+- File is saved to `storage/audio/{audio_id}/`
+- Audio record created in database
+- Returns immediately
+
+### 2. Create Job (Asynchronous)
+```
+POST /api/jobs → Returns job_id
+```
+- Validates audio_id exists
+- Creates job record with status "queued"
+- Enqueues job to Redis
+- Returns immediately
+
+### 3. Worker Processes Job (Background)
+- Celery worker picks up job from Redis
+- Updates status to "running"
+- Processes audio based on job type
+- Updates status to "succeeded" or "failed"
+- Saves output files
+
+### 4. Check Job Status
+```
+GET /api/jobs/{job_id} → Returns current status and output
+```
+
+### 5. Reuse Audio
+- Same `audio_id` can be used for multiple jobs
+- No need to re-upload for different analysis types
 
 ## Project Structure
 
@@ -194,12 +287,46 @@ backend/app/
 
 ## Data Flow
 
-1. **Upload**: Client uploads audio file → Saved to `backend/tmp/jobs/{job_id}/input/`
-2. **Enqueue**: Job is enqueued to Redis via Celery → Task added to queue
-3. **Process**: Celery worker picks up task → Separates audio → Saves stems to `backend/tmp/jobs/{job_id}/stems/`
-4. **Status**: Client queries job status → Returns current status
+### New Architecture (After Refactor)
 
-See [CELERY_SETUP.md](./CELERY_SETUP.md) for detailed architecture.
+1. **Upload Audio**: 
+   - Client uploads audio file → Saved to `storage/audio/{audio_id}/`
+   - Audio record created in database
+   - Returns `audio_id` immediately
+
+2. **Create Job**:
+   - Client creates job with `audio_id` and job type
+   - Job record created with status "queued"
+   - Job enqueued to Redis via Celery
+
+3. **Process Job**:
+   - Celery worker picks up task from Redis
+   - Loads audio file using `audio_id`
+   - Processes based on job type (stem separation, etc.)
+   - Saves output to `storage/jobs/{job_id}/stems/`
+   - Updates job status and output paths
+
+4. **Check Status**:
+   - Client queries job status
+   - Returns current status, progress, and output paths
+
+### File Storage Structure
+
+```
+storage/
+├── audio/
+│   └── {audio_id}/
+│       └── {filename}          # Original uploaded file
+└── jobs/
+    └── {job_id}/
+        └── stems/
+            ├── track.vocals.mp3
+            ├── track.drums.mp3
+            ├── track.bass.mp3
+            └── track.other.mp3
+```
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed architecture.
 
 ## Configuration
 
@@ -264,8 +391,6 @@ pytest
 - Check worker logs for errors
 - Ensure input file exists in job directory
 - Verify task is enqueued (check Redis queue)
-
-See [CELERY_SETUP.md](./CELERY_SETUP.md) for detailed troubleshooting.
 
 ### Separation fails
 

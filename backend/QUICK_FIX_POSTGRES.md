@@ -36,21 +36,44 @@ CREATE DATABASE music;
 ```
 
 ### Step 3: Create Tables
-Run the SQL script:
+
+**If starting fresh:**
 ```bash
 psql -U postgres -d music -f setup_db.sql
 ```
 
-Or manually:
+**If tables already exist (migration):**
+```bash
+psql -U postgres -d music -f migrate_db.sql
+```
+
+**Or manually create tables:**
 ```sql
-CREATE TABLE jobs (
+-- Jobs table
+CREATE TABLE IF NOT EXISTS jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    status VARCHAR NOT NULL DEFAULT 'pending',
+    type VARCHAR NOT NULL,
+    status VARCHAR NOT NULL DEFAULT 'queued',
+    input JSONB NOT NULL,
+    params JSONB,
+    output JSONB,
+    progress REAL DEFAULT 0.0,
     error_message TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Audio table
+CREATE TABLE IF NOT EXISTS audio (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    filename VARCHAR NOT NULL,
+    file_path VARCHAR NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 ```
+
+**Note:** If you're getting errors about missing columns (like `type`, `input`, etc.), your database schema is outdated. Use `migrate_db.sql` to update it, or drop and recreate the tables.
 
 ### Step 4: Restart Server
 The server should auto-reload, but if not:

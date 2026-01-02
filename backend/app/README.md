@@ -50,8 +50,6 @@ Storage / Audio Engine / Database
 Response / Job Status Update
 ```
 
-See [CELERY_SETUP.md](../CELERY_SETUP.md) for detailed Celery architecture.
-
 ## Key Principles
 
 1. **Separation of Concerns**: Each layer has a specific responsibility

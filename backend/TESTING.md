@@ -26,17 +26,39 @@ createdb music
 DATABASE_URL = "postgresql://your_username:your_password@localhost:5432/music"
 ```
 
-4. Create tables (if using Alembic):
+4. Create tables:
+
+**Option A: Use setup script (Recommended)**
 ```bash
-alembic upgrade head
+psql -U postgres -d music -f setup_db.sql
 ```
 
-Or manually create the table:
+**Option B: Use migration script (if tables already exist)**
+```bash
+psql -U postgres -d music -f migrate_db.sql
+```
+
+**Option C: Manual creation**
 ```sql
-CREATE TABLE jobs (
+-- Jobs table
+CREATE TABLE IF NOT EXISTS jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    status VARCHAR NOT NULL DEFAULT 'pending',
+    type VARCHAR NOT NULL,
+    status VARCHAR NOT NULL DEFAULT 'queued',
+    input JSONB NOT NULL,
+    params JSONB,
+    output JSONB,
+    progress REAL DEFAULT 0.0,
     error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Audio table
+CREATE TABLE IF NOT EXISTS audio (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    filename VARCHAR NOT NULL,
+    file_path VARCHAR NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -49,7 +71,9 @@ Modify `app/db/session.py`:
 DATABASE_URL = "sqlite:///./test.db"
 ```
 
-SQLite doesn't support UUID natively, so you'll need to adjust the Job model temporarily or use a different approach.
+**Note:** SQLite is supported via the custom `GUID` TypeDecorator which stores UUIDs as TEXT. The application will automatically handle the conversion.
+
+**For existing SQLite databases:** If you have an old database, you may need to migrate it. See `migrate_db.sql` for instructions, or simply delete the database file and let the application recreate it on startup.
 
 ### 3. Verify FFmpeg
 
@@ -106,11 +130,35 @@ Expected response:
 {"status":"ok"}
 ```
 
-### 2. Create a Job (Upload Audio File)
+### 2. Upload Audio File
+
+```bash
+curl -X POST "http://localhost:8000/api/audio" \
+  -F "file=@/path/to/your/audio.mp3"
+```
+
+Expected response:
+```json
+{
+  "audio_id": "550e8400-e29b-41d4-a716-446655440000",
+  "filename": "audio.mp3"
+}
+```
+
+**Save the `audio_id` from the response!**
+
+### 3. Create a Job
 
 ```bash
 curl -X POST "http://localhost:8000/api/jobs" \
-  -F "file=@/path/to/your/audio.mp3"
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "stem_separation",
+    "input": {
+      "audio_id": "550e8400-e29b-41d4-a716-446655440000"
+    },
+    "params": {}
+  }'
 ```
 
 **Windows PowerShell:**
@@ -143,16 +191,22 @@ Expected response:
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "pending",
+  "type": "stem_separation",
+  "status": "queued",
+  "input": {
+    "audio_id": "550e8400-e29b-41d4-a716-446655440000"
+  },
+  "params": {},
+  "progress": 0.0,
   "error_message": null,
   "created_at": "2024-01-01T12:00:00Z",
-  "updated_at": null
+  "updated_at": "2024-01-01T12:00:00Z"
 }
 ```
 
 **Save the `id` from the response!**
 
-### 3. Check Job Status
+### 4. Check Job Status
 
 ```bash
 curl http://localhost:8000/api/jobs/{job_id}
@@ -166,7 +220,13 @@ Expected responses:
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "processing",
+  "type": "stem_separation",
+  "status": "running",
+  "input": {
+    "audio_id": "550e8400-e29b-41d4-a716-446655440000"
+  },
+  "params": {},
+  "progress": 0.5,
   "error_message": null,
   "created_at": "2024-01-01T12:00:00Z",
   "updated_at": "2024-01-01T12:00:01Z"
@@ -177,14 +237,26 @@ Expected responses:
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "completed",
+  "type": "stem_separation",
+  "status": "succeeded",
+  "input": {
+    "audio_id": "550e8400-e29b-41d4-a716-446655440000"
+  },
+  "params": {},
+  "output": {
+    "vocals": "path/to/vocals.wav",
+    "drums": "path/to/drums.wav",
+    "bass": "path/to/bass.wav",
+    "other": "path/to/other.wav"
+  },
+  "progress": 1.0,
   "error_message": null,
   "created_at": "2024-01-01T12:00:00Z",
   "updated_at": "2024-01-01T12:00:05Z"
 }
 ```
 
-### 4. Verify Output Files
+### 5. Verify Output Files
 
 Check that stems were created:
 
@@ -221,17 +293,35 @@ def test_health():
     assert response.json()["status"] == "ok"
     print("✓ Health check passed")
 
-def test_create_job(audio_file_path):
-    """Test job creation"""
-    print(f"\nCreating job with file: {audio_file_path}")
+def test_upload_audio(audio_file_path):
+    """Test audio upload"""
+    print(f"\nUploading audio file: {audio_file_path}")
     with open(audio_file_path, "rb") as f:
         files = {"file": f}
-        response = requests.post(f"{API_BASE}/jobs", files=files)
+        response = requests.post(f"{API_BASE}/audio", files=files)
+    
+    assert response.status_code == 201
+    audio = response.json()
+    audio_id = audio["audio_id"]
+    print(f"✓ Audio uploaded: {audio_id}")
+    print(f"  Filename: {audio['filename']}")
+    return audio_id
+
+def test_create_job(audio_id):
+    """Test job creation"""
+    print(f"\nCreating job for audio: {audio_id}")
+    job_data = {
+        "type": "stem_separation",
+        "input": {"audio_id": audio_id},
+        "params": {}
+    }
+    response = requests.post(f"{API_BASE}/jobs", json=job_data)
     
     assert response.status_code == 201
     job = response.json()
     job_id = job["id"]
     print(f"✓ Job created: {job_id}")
+    print(f"  Type: {job['type']}")
     print(f"  Status: {job['status']}")
     return job_id
 
@@ -251,7 +341,7 @@ def wait_for_completion(job_id, max_wait=300):
     
     while time.time() - start_time < max_wait:
         status = test_get_job(job_id)
-        if status == "completed":
+        if status == "succeeded":
             print("✓ Job completed successfully!")
             return True
         elif status == "failed":
@@ -275,7 +365,8 @@ if __name__ == "__main__":
     
     try:
         test_health()
-        job_id = test_create_job(audio_file)
+        audio_id = test_upload_audio(audio_file)
+        job_id = test_create_job(audio_id)
         success = wait_for_completion(job_id)
         sys.exit(0 if success else 1)
     except Exception as e:
@@ -356,8 +447,16 @@ Both the API server and worker output logs. Watch for:
 
 Check job status directly:
 ```sql
-SELECT id, status, error_message, created_at, updated_at 
+SELECT id, type, status, progress, error_message, created_at, updated_at 
 FROM jobs 
+ORDER BY created_at DESC 
+LIMIT 10;
+```
+
+Check audio files:
+```sql
+SELECT id, filename, file_path, created_at 
+FROM audio 
 ORDER BY created_at DESC 
 LIMIT 10;
 ```

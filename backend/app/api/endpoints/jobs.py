@@ -2,25 +2,56 @@
 Jobs API endpoints.
 
 This module provides HTTP endpoints for job management:
-- POST /jobs: Create a new job and upload audio file
+- POST /jobs: Create a new job
 - GET /jobs/{job_id}: Get job status by ID
 """
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status as http_status
+from fastapi import APIRouter, Depends, HTTPException, status as http_status
 from sqlalchemy.orm import Session
 from uuid import UUID, uuid4
-from pathlib import Path
 import logging
 
 from app.db.session import get_db
 from app.services.job_service import JobService
-from app.storage.local_storage import LocalStorage
-from app.schemas.job import JobResponse
-from app.core.constants import STORAGE_ROOT
+from app.services.audio_service import AudioService
+from app.schemas.job import JobResponse, JobCreate
+from app.core.constants import JobType
 from app.tasks.job_tasks import process_audio_job
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+def _build_job_response(job) -> JobResponse:
+    """
+    Build a JobResponse from a Job model.
+    
+    Helper function to avoid code duplication between create_job and get_job.
+    
+    Args:
+        job: Job model instance
+        
+    Returns:
+        JobResponse instance
+    """
+    # Extract audio_id from input for response
+    extracted_audio_id = UUID(job.input.get("audio_id"))
+    
+    # Convert job to response format
+    response_data = {
+        "job_id": job.id,
+        "type": job.type,
+        "status": job.status,
+        "audio_id": extracted_audio_id,
+        "input": job.input,
+        "params": job.params,
+        "output": job.output,
+        "progress": job.progress,
+        "error_message": job.error_message,
+        "created_at": job.created_at,
+        "updated_at": job.updated_at
+    }
+    return JobResponse(**response_data)
 
 
 def get_job_service(db: Session = Depends(get_db)) -> JobService:
@@ -33,83 +64,88 @@ def get_job_service(db: Session = Depends(get_db)) -> JobService:
     return JobService(db)
 
 
-def get_storage() -> LocalStorage:
+def get_audio_service(db: Session = Depends(get_db)) -> AudioService:
     """
-    Dependency for getting LocalStorage instance.
+    Dependency for getting AudioService instance.
     
-    Creates a storage instance for file operations.
-    In the future, this could be configured via environment variables.
+    FastAPI will automatically call this function for each request,
+    creating a new AudioService instance tied to the request's database session.
     """
-    return LocalStorage(root=Path(STORAGE_ROOT))
+    return AudioService(db)
 
 
 @router.post("", response_model=JobResponse, status_code=http_status.HTTP_201_CREATED)
 def create_job(
-    file: UploadFile = File(...),
+    job_data: JobCreate,
     job_service: JobService = Depends(get_job_service),
-    storage: LocalStorage = Depends(get_storage)
+    audio_service: AudioService = Depends(get_audio_service)
 ):
     """
-    Create a new job and upload the audio file.
+    Create a new job.
     
     This endpoint:
-    1. Generates a unique job ID
-    2. Creates a job record in the database with status "pending"
-    3. Saves the uploaded audio file to the job's input directory
-    4. Returns the job information
-    
-    The uploaded file is saved to: {storage_root}/jobs/{job_id}/input/{filename}
+    1. Validates the audio_id exists
+    2. Validates the job type
+    3. Generates a unique job ID
+    4. Creates a job record in the database with status "queued"
+    5. Enqueues the job for processing
+    6. Returns the job information
     
     Args:
-        file: Uploaded audio file
+        job_data: Job creation data (type, input, params)
         job_service: Injected JobService instance
-        storage: Injected LocalStorage instance
+        audio_service: Injected AudioService instance
         
     Returns:
         JobResponse with job details
         
     Raises:
-        HTTPException: If file save fails (500) or validation fails
+        HTTPException: If audio_id not found (404) or validation fails (400)
     """
-    job_id = uuid4()
-    logger.info(f"Creating new job: {job_id}")
+    # Validate audio_id exists and get path
+    audio_id = job_data.input.audio_id
+    audio_path = audio_service.get_audio_path(audio_id)
+    if not audio_path:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Audio with id {audio_id} not found"
+        )
     
-    # Create job in database with "pending" status
-    job = job_service.create_job(job_id, status="pending")
+    # Validate job type
+    valid_types = [JobType.STEM_SEPARATION, JobType.MELODY_EXTRACTION, JobType.CHORD_ANALYSIS]
+    if job_data.type not in valid_types:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid job type. Valid types: {', '.join(valid_types)}"
+        )
+    
+    job_id = uuid4()
+    logger.info(f"Creating new job: {job_id} of type: {job_data.type}")
+    
+    # Create job in database with "queued" status
+    job = job_service.create_job(
+        job_id=job_id,
+        job_type=job_data.type,
+        input_data={"audio_id": str(audio_id)},
+        params=job_data.params
+    )
     logger.debug(f"Job {job_id} created in database")
     
-    # Save uploaded file to storage
+    # Enqueue job for processing with Celery
     try:
-        file_path = storage.save_input_file(
-            job_id=str(job_id),
-            file=file.file,
-            filename=file.filename
-        )
-        logger.info(f"File saved for job {job_id}: {file_path}")
-        
-        # Enqueue job for processing with Celery
-        try:
-            process_audio_job.delay(str(job_id))
-            logger.info(f"Job {job_id} enqueued for processing")
-        except Exception as e:
-            # Log error but don't fail the request - job is created and file is saved
-            # Job will remain in "pending" status and can be manually retried or processed later
-            logger.error(
-                f"Failed to enqueue job {job_id} for processing: {e}",
-                exc_info=True
-            )
-            # Note: We don't update job status here because the job is valid,
-            # just the queue system is temporarily unavailable
-        
-        return JobResponse.model_validate(job)
+        process_audio_job.delay(str(job_id))
+        logger.info(f"Job {job_id} enqueued for processing")
     except Exception as e:
-        # Update job status to failed if file save fails
-        logger.error(f"Failed to save file for job {job_id}: {e}")
-        job_service.update_job_status(job_id, "failed", error_message=str(e))
-        raise HTTPException(
-            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save file: {str(e)}"
+        # Log error but don't fail the request - job is created
+        # Job will remain in "queued" status and can be manually retried
+        logger.error(
+            f"Failed to enqueue job {job_id} for processing: {e}",
+            exc_info=True
         )
+        # Note: We don't update job status here because the job is valid,
+        # just the queue system is temporarily unavailable
+    
+    return _build_job_response(job)
 
 
 @router.get("/{job_id}", response_model=JobResponse)
@@ -140,4 +176,4 @@ def get_job(
             detail=f"Job {job_id} not found"
         )
     
-    return JobResponse.model_validate(job)
+    return _build_job_response(job)
