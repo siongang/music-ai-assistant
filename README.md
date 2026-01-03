@@ -19,11 +19,11 @@ Music Assistant is a comprehensive music analysis platform that combines advance
 ### Current (Backend)
 - ✅ **Audio Upload**: Upload audio files via REST API
 - ✅ **Stem Separation**: Automatically separate audio into stems using Demucs
+- ✅ **MIDI Conversion**: Convert audio to MIDI format using Basic Pitch
 - ✅ **Job Management**: Asynchronous job processing with status tracking
-- ✅ **Flexible Architecture**: Support for multiple job types (stem separation, melody extraction, chord analysis)
+- ✅ **Flexible Architecture**: Support for multiple job types (stem separation, MIDI conversion, melody extraction, chord analysis)
 
 ### Planned
-- 🔄 **MIDI Extraction**: Convert audio to MIDI format
 - 🔄 **MusicXML Conversion**: Convert MIDI to MusicXML for sheet music display
 - 🔄 **LLM Integration**: Enrich musical data with LLM for intelligent querying
 - 🔄 **DAW-like UI**: View notes in piano roll and sheet music formats
@@ -49,7 +49,7 @@ Music Assistant is a comprehensive music analysis platform that combines advance
        └──► Celery Workers ──► Audio Processing
                               │
                               ├──► Stem Separation (Demucs)
-                              ├──► MIDI Extraction (Future)
+                              ├──► MIDI Conversion (Basic Pitch)
                               ├──► Chord Analysis (Future)
                               └──► Melody Extraction (Future)
 ```
@@ -116,6 +116,8 @@ Response:
 ```
 
 ### 2. Create Job
+
+**Stem Separation:**
 ```bash
 POST /api/jobs
 Content-Type: application/json
@@ -127,6 +129,23 @@ Content-Type: application/json
   },
   "params": {
     "model": "demucs_v4"
+  }
+}
+```
+
+**MIDI Conversion:**
+```bash
+POST /api/jobs
+Content-Type: application/json
+
+{
+  "type": "midi_conversion",
+  "input": {
+    "audio_id": "abc-123-def"
+  },
+  "params": {
+    "save_notes": true,
+    "midi_tempo": 120
   }
 }
 ```
@@ -147,7 +166,7 @@ Response:
 GET /api/jobs/{job_id}
 ```
 
-Response:
+Response (Stem Separation):
 ```json
 {
   "job_id": "xyz-789",
@@ -155,7 +174,20 @@ Response:
   "output": {
     "vocals": "jobs/xyz-789/stems/track.vocals.mp3",
     "drums": "jobs/xyz-789/stems/track.drums.mp3",
-    ...
+    "bass": "jobs/xyz-789/stems/track.bass.mp3",
+    "other": "jobs/xyz-789/stems/track.other.mp3"
+  }
+}
+```
+
+Response (MIDI Conversion):
+```json
+{
+  "job_id": "abc-456",
+  "status": "succeeded",
+  "output": {
+    "midi": "jobs/abc-456/midi/track.mid",
+    "notes": "jobs/abc-456/midi/track_notes.csv"
   }
 }
 ```
@@ -182,15 +214,18 @@ Response:
 - **Backend**: FastAPI (Python)
 - **Database**: PostgreSQL / SQLite
 - **Queue**: Redis + Celery
-- **Audio Processing**: Demucs (PyTorch)
-- **Future**: LLM integration, MIDI libraries, MusicXML
+- **Audio Processing**: 
+  - Demucs (PyTorch) for stem separation
+  - Basic Pitch (TensorFlow) for MIDI conversion
+- **Future**: LLM integration, MusicXML
 
 ## Development Status
 
 - ✅ **Phase 1**: Audio upload and stem separation (Complete)
-- 🔄 **Phase 2**: MIDI extraction and analysis (In Progress)
-- 📋 **Phase 3**: LLM integration (Planned)
-- 📋 **Phase 4**: Frontend DAW-like interface (Planned)
+- ✅ **Phase 2**: MIDI conversion (Complete)
+- 🔄 **Phase 3**: Music analysis (chord detection, melody extraction) (In Progress)
+- 📋 **Phase 4**: LLM integration (Planned)
+- 📋 **Phase 5**: Frontend DAW-like interface (Planned)
 
 ## Contributing
 
@@ -200,7 +235,7 @@ Response:
 
 ## Roadmap
 
-- [ ] MIDI extraction from audio
+- [x] MIDI conversion from audio
 - [ ] MusicXML conversion
 - [ ] Chord detection and analysis
 - [ ] Melody extraction

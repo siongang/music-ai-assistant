@@ -3,15 +3,18 @@ Pipeline runner service for audio processing.
 
 This service orchestrates different audio processing operations:
 - Stem separation
+- MIDI conversion
 - Melody extraction
 - Chord analysis
 """
 from pathlib import Path
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from app.services.stem_service import StemService
-from app.core.constants import DEFAULT_STEM_FORMAT, STEMS_DIR
+from app.services.midi_service import MidiService
+from app.core.constants import DEFAULT_STEM_FORMAT, STEMS_DIR, MIDI_DIR
+from app.utils.midi_utils import save_midi_file, save_note_events
 from demucs.audio import save_audio
 
 logger = logging.getLogger(__name__)
@@ -23,6 +26,7 @@ class PipelineRunnerService:
     
     Provides methods for different types of audio processing:
     - Stem separation
+    - MIDI conversion
     - Melody extraction (future)
     - Chord analysis (future)
     """
@@ -35,6 +39,7 @@ class PipelineRunnerService:
             storage: Storage instance for file operations
         """
         self.stem_service = StemService()
+        self.midi_service = MidiService()
         self.storage = storage
         logger.debug("Initialized PipelineRunnerService")
 
@@ -137,6 +142,102 @@ class PipelineRunnerService:
                 output_files[stem_name] = relative_path
         
         logger.info(f"Successfully processed stem separation for job {job_id}")
+        return output_files
+    
+    def process_midi_conversion(
+        self,
+        audio_file_path: Path,
+        job_id: str,
+        params: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """
+        Process MIDI conversion for an audio file.
+        
+        This method:
+        1. Calls MIDI service to convert audio to raw MIDI data
+        2. Saves MIDI and note files to the job's output directory
+        3. Returns output file paths (relative to storage root)
+        
+        Args:
+            audio_file_path: Path to input audio file
+            job_id: Job identifier for output directory
+            params: Optional parameters (e.g., {"midi_tempo": 120, "save_notes": True})
+            
+        Returns:
+            dict: Output files mapping file types to relative paths
+            Example: {"midi": "jobs/{job_id}/midi/track.mid", 
+                     "notes": "jobs/{job_id}/midi/track_notes.csv"}
+            
+        Raises:
+            ValueError: If input path is invalid or conversion fails
+            RuntimeError: If saving MIDI files fails
+        """
+        logger.info(f"Processing MIDI conversion for job {job_id}")
+        
+        # Prepare output directory
+        if not self.storage:
+            raise ValueError("Storage instance required for MIDI conversion")
+        
+        job_path = self.storage.job_path(job_id)
+        midi_path = job_path / MIDI_DIR
+        midi_path.mkdir(parents=True, exist_ok=True)
+        
+        # Get parameters from params or use defaults
+        if params is None:
+            params = {}
+        
+        save_notes_flag = params.get("save_notes", True)
+        midi_tempo = params.get("midi_tempo", None)
+        
+        logger.debug(
+            f"MIDI conversion params: save_notes={save_notes_flag}, "
+            f"midi_tempo={midi_tempo}"
+        )
+        
+        # Call MIDI service to get raw MIDI data (no file I/O in service layer)
+        try:
+            midi_data, note_events = self.midi_service.convert_to_midi(
+                audio_path=audio_file_path,
+                midi_tempo=midi_tempo,
+            )
+            logger.info(f"MIDI conversion successful, received {len(note_events)} notes")
+        except Exception as e:
+            logger.error(f"Failed to convert audio to MIDI: {e}")
+            raise RuntimeError(f"Failed to convert audio to MIDI: {e}") from e
+        
+        # Extract track name from input filename (without extension)
+        track = Path(audio_file_path).name.rsplit(".", 1)[0]
+        
+        # Prepare output file paths
+        output_files = {}
+        storage_root = self.storage.root
+        
+        # Save MIDI file
+        midi_filename = f"{track}.mid"
+        midi_file_path = midi_path / midi_filename
+        try:
+            save_midi_file(midi_data, midi_file_path)
+            relative_path = midi_file_path.relative_to(storage_root)
+            output_files["midi"] = str(relative_path)
+            logger.debug(f"Saved MIDI file: {relative_path}")
+        except Exception as e:
+            logger.error(f"Failed to save MIDI file: {e}")
+            raise RuntimeError(f"Failed to save MIDI file: {e}") from e
+        
+        # Save notes CSV if requested
+        if save_notes_flag and note_events:
+            notes_filename = f"{track}_notes.csv"
+            notes_file_path = midi_path / notes_filename
+            try:
+                save_note_events(note_events, notes_file_path)
+                relative_path = notes_file_path.relative_to(storage_root)
+                output_files["notes"] = str(relative_path)
+                logger.debug(f"Saved notes CSV: {relative_path}")
+            except Exception as e:
+                logger.error(f"Failed to save notes CSV: {e}")
+                raise RuntimeError(f"Failed to save notes CSV: {e}") from e
+        
+        logger.info(f"Successfully processed MIDI conversion for job {job_id}")
         return output_files
     
     def process_melody_extraction(

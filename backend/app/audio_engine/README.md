@@ -2,59 +2,98 @@
 
 ## Purpose
 
-The audio engine handles all audio processing operations, including stem separation using the Demucs library.
+Low-level audio processing components. This layer handles the actual audio signal processing and machine learning model inference. Returns raw data only (no file I/O).
 
 ## Key Components
 
-- **`stems/`**: Stem separation functionality (Demucs wrapper)
-- **`pipeline/`**: Audio processing pipeline orchestration
+- **`stems/`**: Stem separation using Demucs (PyTorch)
+- **`midi/`**: MIDI conversion using Basic Pitch (TensorFlow)
+- **`pipeline/`**: Audio processing pipeline (future)
 
 ## Architecture
 
+The audio engine is the lowest layer in the application architecture. It contains raw audio processing code without knowledge of HTTP, databases, or storage. All components return raw data structures (tensors, MIDI objects) without performing file I/O.
+
 ```
-Input Audio File
+Audio File (as path)
   ↓
-DemucsSeparator (stems/demucs_separator.py)
+Audio Engine (this folder)
   ↓
-Demucs Library (external)
-  ↓
-Separated Stems (vocals, drums, bass, other)
-  ↓
-Pipeline Processing (pipeline/process_audio.py)
-  ↓
-Output Files
+Processed Data (tensors, MIDI objects, note events)
 ```
+
+## Separation of Concerns
+
+**Audio Engine Responsibility:**
+- Load and process audio data
+- Run ML models (Demucs, Basic Pitch)
+- Return raw outputs (tensors, MIDI objects)
+- NO file I/O operations
+
+**Service Layer Responsibility:**
+- Wrap audio engine components
+- Add business logic
+- Return raw data to pipeline runner
+
+**Pipeline Runner Responsibility:**
+- Call services for raw data
+- Handle all file I/O operations
+- Save outputs to storage
+
+## Components
+
+### Stems (`stems/`)
+- **`demucs_separator.py`**: Wrapper around Demucs library
+- Uses Demucs API for separation
+- Returns raw audio tensors (no file I/O)
+- PyTorch-based
+- Model: `htdemucs` (default)
+- Output: Vocals, drums, bass, other
+
+### MIDI (`midi/`)
+- **`to_midi.py`**: Wrapper around Basic Pitch library
+- Converts audio to MIDI using Basic Pitch inference
+- Returns PrettyMIDI objects and note events (no file I/O)
+- TensorFlow-based
+- Note: Uses lazy imports to avoid TF/PyTorch conflicts
+- Output: MIDI data, note events (start, end, pitch, velocity)
+
+### Pipeline (`pipeline/`)
+- Future: Complex audio processing workflows
+- Orchestration of multiple processing steps
 
 ## Important Notes
 
-1. **Demucs Dependency**: Requires Demucs library and PyTorch
-2. **Device Selection**: Can use CPU or GPU (CUDA) - auto-detects by default
-3. **Model**: Currently uses `htdemucs` model (default)
-4. **FFmpeg Required**: Demucs uses FFmpeg for audio loading
-5. **Memory Usage**: Large audio files may require significant RAM/VRAM
-
-## Current Implementation
-
-- **Stem Separation**: Uses Demucs `htdemucs` model
-- **Output Format**: MP3 (configurable via constants)
-- **Sample Rate**: 44100 Hz (model default)
-
-## Future Improvements
-
-- [ ] Add support for different Demucs models (mdx, htdemucs_ft, etc.)
-- [ ] Add GPU device selection via environment variable
-- [ ] Add model caching/optimization
-- [ ] Add progress tracking for long separations
-- [ ] Add support for different output formats (WAV, FLAC, etc.)
-- [ ] Add audio preprocessing (normalization, format conversion)
-- [ ] Add batch processing for multiple files
-- [ ] Add quality/speed tradeoff options
-- [ ] Add custom model support
-- [ ] Add real-time processing capabilities
+1. **No File I/O**: Audio engine components should never read/write files directly
+2. **Framework Isolation**: MIDI (TensorFlow) and Stems (PyTorch) use lazy imports
+3. **Raw Data Only**: Return tensors, objects, arrays - not file paths
+4. **Stateless**: Components should be stateless where possible
+5. **Type Hints**: All methods should have proper type hints
 
 ## Dependencies
 
-- `demucs`: Audio source separation library
-- `torch`: PyTorch for model inference
-- `soundfile`: Audio file I/O
-- `ffmpeg`: Audio processing (system dependency)
+- **Demucs**: Audio source separation library (PyTorch)
+- **Basic Pitch**: Audio-to-MIDI conversion (TensorFlow)
+- **PyTorch**: Deep learning framework for Demucs
+- **TensorFlow**: Deep learning framework for Basic Pitch
+- **FFmpeg**: Audio processing (system dependency)
+
+## Device Support
+
+- **CPU**: All models work on CPU
+- **GPU**: CUDA-enabled GPUs supported for faster processing
+- **Auto-detection**: Both Demucs and Basic Pitch auto-detect available devices
+
+## Future Improvements
+
+- [ ] Add pipeline orchestration for complex workflows
+- [ ] Add audio preprocessing utilities
+- [ ] Add audio feature extraction
+- [ ] Add melody extraction
+- [ ] Add chord detection
+- [ ] Add beat tracking
+- [ ] Add tempo detection
+- [ ] Add key detection
+- [ ] Add model caching/optimization
+- [ ] Add progress tracking for long operations
+- [ ] Add batch processing support

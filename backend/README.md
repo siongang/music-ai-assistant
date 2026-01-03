@@ -5,8 +5,9 @@ FastAPI backend for music analysis and processing. Part of the Music Assistant p
 ## Features
 
 - **Audio Upload**: Upload audio files separately from job creation (upload once, use many times)
-- **Flexible Jobs**: Create different types of jobs (stem separation, melody extraction, chord analysis)
+- **Flexible Jobs**: Create different types of jobs (stem separation, MIDI conversion, melody extraction, chord analysis)
 - **Stem Separation**: Automatically separate audio into stems (vocals, drums, bass, other) using Demucs
+- **MIDI Conversion**: Convert audio to MIDI format with note events using Basic Pitch
 - **Job Management**: Track job status, progress, and results
 - **Background Processing**: Asynchronous job processing via Celery and Redis
 - **Extensible Architecture**: Easy to add new job types and processing pipelines
@@ -199,7 +200,7 @@ Response (Running):
 }
 ```
 
-Response (Completed):
+Response (Stem Separation - Completed):
 ```json
 {
   "job_id": "xyz-789",
@@ -215,6 +216,38 @@ Response (Completed):
   },
   "created_at": "2024-01-01T00:00:00Z",
   "updated_at": "2024-01-01T00:00:30Z"
+}
+```
+
+#### 4. MIDI Conversion
+
+```bash
+curl -X POST http://localhost:8000/api/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "midi_conversion",
+    "input": {"audio_id": "abc-123-def"},
+    "params": {
+      "save_notes": true,
+      "midi_tempo": 120
+    }
+  }'
+```
+
+Response (MIDI Conversion - Completed):
+```json
+{
+  "job_id": "abc-456",
+  "type": "midi_conversion",
+  "status": "succeeded",
+  "audio_id": "abc-123-def",
+  "progress": 1.0,
+  "output": {
+    "midi": "jobs/abc-456/midi/track.mid",
+    "notes": "jobs/abc-456/midi/track_notes.csv"
+  },
+  "created_at": "2024-01-01T00:00:00Z",
+  "updated_at": "2024-01-01T00:00:45Z"
 }
 ```
 

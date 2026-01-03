@@ -128,6 +128,10 @@ def process_audio_job(self, job_id: str) -> Dict[str, Any]:
                 result = _process_stem_separation(
                     job_uuid, job_service, storage, audio_file_path, job.params
                 )
+            elif job.type == JobType.MIDI_CONVERSION:
+                result = _process_midi_conversion(
+                    job_uuid, job_service, storage, audio_file_path, job.params
+                )
             elif job.type == JobType.MELODY_EXTRACTION:
                 result = _process_melody_extraction(
                     job_uuid, job_service, storage, audio_file_path, job.params
@@ -217,6 +221,45 @@ def _process_stem_separation(
     # Process stem separation using service
     pipeline_runner = PipelineRunnerService(storage)
     output_files = pipeline_runner.process_stem_separation(
+        audio_file_path=audio_file_path,
+        job_id=str(job_id),
+        params=params
+    )
+    
+    # Update job status to succeeded with output
+    job_service.update_job_status(
+        job_id,
+        JobStatus.SUCCEEDED,
+        progress=1.0,
+        output=output_files
+    )
+    
+    return {"status": "succeeded", "output": output_files}
+
+
+def _process_midi_conversion(
+    job_id: UUID,
+    job_service: JobService,
+    storage: LocalStorage,
+    audio_file_path: Path,
+    params: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Process a MIDI conversion job.
+    
+    Args:
+        job_id: Job UUID
+        job_service: JobService instance
+        storage: Storage instance
+        audio_file_path: Path to input audio file
+        params: Job parameters (e.g., {"save_notes": True, "midi_tempo": 120})
+        
+    Returns:
+        dict: Result with status and output data
+    """
+    # Process MIDI conversion using service
+    pipeline_runner = PipelineRunnerService(storage)
+    output_files = pipeline_runner.process_midi_conversion(
         audio_file_path=audio_file_path,
         job_id=str(job_id),
         params=params

@@ -169,7 +169,7 @@ if __name__ == "__main__":
     #     print(f"Encoded WAV file: {wav_file}")
 
 
-    
+
     # out_dir = Path("output/")
     # out_dir.mkdir(parents=True, exist_ok=True)
     # results = to_midi.predict(

@@ -9,7 +9,7 @@ Main application package containing all backend components organized by layer.
 ```
 app/
 ├── api/              # API endpoints and routing
-├── audio_engine/     # Audio processing (Demucs)
+├── audio_engine/     # Audio processing (Demucs, Basic Pitch)
 ├── core/            # Core constants and configuration
 ├── db/              # Database configuration and session management
 ├── models/          # SQLAlchemy database models
@@ -17,6 +17,7 @@ app/
 ├── services/        # Business logic services
 ├── storage/         # Storage abstraction layer
 ├── tasks/           # Celery tasks for background processing (current)
+├── utils/           # Utility functions (MIDI, file operations)
 ├── workers/         # Legacy workers (deprecated)
 ├── celery_app.py    # Celery application configuration
 └── main.py          # FastAPI application entry point
@@ -27,10 +28,11 @@ app/
 1. **API Layer** (`api/`): HTTP endpoints, request/response handling
 2. **Service Layer** (`services/`): Business logic and orchestration
 3. **Storage Layer** (`storage/`): File storage abstraction
-4. **Audio Engine** (`audio_engine/`): Audio processing (Demucs)
-5. **Database Layer** (`db/`, `models/`): Data persistence
-6. **Task Layer** (`tasks/`): Celery tasks for asynchronous job processing (current)
-7. **Worker Layer** (`workers/`): Legacy workers (deprecated)
+4. **Audio Engine** (`audio_engine/`): Audio processing (Demucs for stems, Basic Pitch for MIDI)
+5. **Utils** (`utils/`): Utility functions for file operations, MIDI handling
+6. **Database Layer** (`db/`, `models/`): Data persistence
+7. **Task Layer** (`tasks/`): Celery tasks for asynchronous job processing (current)
+8. **Worker Layer** (`workers/`): Legacy workers (deprecated)
 
 ## Data Flow
 

@@ -37,6 +37,7 @@ class JobStatus:
 class JobType:
     """Job type constants"""
     STEM_SEPARATION = "stem_separation"
+    MIDI_CONVERSION = "midi_conversion"
     MELODY_EXTRACTION = "melody_extraction"
     CHORD_ANALYSIS = "chord_analysis"
 
@@ -63,6 +64,7 @@ JOBS_DIR = "jobs"
 AUDIO_DIR = "audio"
 INPUT_DIR = "input"
 STEMS_DIR = "stems"
+MIDI_DIR = "midi"
 
 # File upload limits
 MAX_FILE_SIZE_MB = 500  # Maximum file size in megabytes

@@ -112,7 +112,12 @@ def create_job(
         )
     
     # Validate job type
-    valid_types = [JobType.STEM_SEPARATION, JobType.MELODY_EXTRACTION, JobType.CHORD_ANALYSIS]
+    valid_types = [
+        JobType.STEM_SEPARATION, 
+        JobType.MIDI_CONVERSION,
+        JobType.MELODY_EXTRACTION, 
+        JobType.CHORD_ANALYSIS
+    ]
     if job_data.type not in valid_types:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
