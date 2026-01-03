@@ -80,10 +80,12 @@ dump.rdb
 *.ogg
 *.aiff
 *.m4a
+*.mid
+*.midi
 
 # Generated audio outputs
 outputs/
-midi/
+# midi/  # Commented out to allow midi Python code to be tracked
 renders/
 tmp/
 temp/
@@ -141,3 +143,5 @@ infra/secrets/
 *.tar.gz
 *.bak
 *.tmp
+*.txt
+*.csv
