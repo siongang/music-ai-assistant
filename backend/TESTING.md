@@ -104,17 +104,32 @@ INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 ```
 
-### Terminal 2: Start Worker
+### Terminal 2: Start Redis
+
+```bash
+# Linux/WSL
+sudo service redis-server start
+
+# macOS
+brew services start redis
+
+# Verify Redis is running
+redis-cli ping  # Should return: PONG
+```
+
+### Terminal 3: Start Celery Worker
 
 ```bash
 cd backend
-python -m app.workers.audio_job_worker
+./start_celery_worker.sh
+# or manually:
+celery -A app.celery_app worker --loglevel=info
 ```
 
 You should see:
 ```
-INFO:     AudioJobWorker initialized
-INFO:     Worker started. Polling every 5 seconds...
+[INFO] celery@hostname ready.
+[INFO] Connected to redis://localhost:6379/0
 ```
 
 ## Testing the API
@@ -149,6 +164,8 @@ Expected response:
 
 ### 3. Create a Job
 
+Use the `audio_id` from step 2 to create a job:
+
 ```bash
 curl -X POST "http://localhost:8000/api/jobs" \
   -H "Content-Type: application/json" \
@@ -161,42 +178,49 @@ curl -X POST "http://localhost:8000/api/jobs" \
   }'
 ```
 
-**Windows PowerShell:**
-```powershell
-$filePath = "C:\path\to\your\audio.mp3"
-Invoke-RestMethod -Uri "http://localhost:8000/api/jobs" `
-  -Method Post `
-  -InFile $filePath `
-  -ContentType "multipart/form-data"
-```
-
-**Linux/WSL (Ubuntu):**
+**Or for MIDI conversion:**
 ```bash
 curl -X POST "http://localhost:8000/api/jobs" \
-  -F "file=@/path/to/your/audio.mp3"
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "midi_conversion",
+    "input": {
+      "audio_id": "550e8400-e29b-41d4-a716-446655440000"
+    },
+    "params": {
+      "save_notes": true,
+      "midi_tempo": 120
+    }
+  }'
 ```
 
 **Using Python requests:**
 ```python
 import requests
 
+# Create stem separation job
 url = "http://localhost:8000/api/jobs"
-with open("path/to/your/audio.mp3", "rb") as f:
-    files = {"file": f}
-    response = requests.post(url, files=files)
-    print(response.json())
+job_data = {
+    "type": "stem_separation",
+    "input": {"audio_id": "550e8400-e29b-41d4-a716-446655440000"},
+    "params": {}
+}
+response = requests.post(url, json=job_data)
+print(response.json())
 ```
 
 Expected response:
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "job_id": "abc-123-def",
   "type": "stem_separation",
   "status": "queued",
+  "audio_id": "550e8400-e29b-41d4-a716-446655440000",
   "input": {
     "audio_id": "550e8400-e29b-41d4-a716-446655440000"
   },
   "params": {},
+  "output": null,
   "progress": 0.0,
   "error_message": null,
   "created_at": "2024-01-01T12:00:00Z",
@@ -204,7 +228,7 @@ Expected response:
 }
 ```
 
-**Save the `id` from the response!**
+**Save the `job_id` from the response!**
 
 ### 4. Check Job Status
 
@@ -233,26 +257,52 @@ Expected responses:
 }
 ```
 
-**After completion:**
+**After completion (Stem Separation):**
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "job_id": "abc-123-def",
   "type": "stem_separation",
   "status": "succeeded",
+  "audio_id": "550e8400-e29b-41d4-a716-446655440000",
   "input": {
     "audio_id": "550e8400-e29b-41d4-a716-446655440000"
   },
   "params": {},
   "output": {
-    "vocals": "path/to/vocals.wav",
-    "drums": "path/to/drums.wav",
-    "bass": "path/to/bass.wav",
-    "other": "path/to/other.wav"
+    "vocals": "jobs/abc-123-def/stems/track.vocals.mp3",
+    "drums": "jobs/abc-123-def/stems/track.drums.mp3",
+    "bass": "jobs/abc-123-def/stems/track.bass.mp3",
+    "other": "jobs/abc-123-def/stems/track.other.mp3"
   },
   "progress": 1.0,
   "error_message": null,
   "created_at": "2024-01-01T12:00:00Z",
   "updated_at": "2024-01-01T12:00:05Z"
+}
+```
+
+**After completion (MIDI Conversion):**
+```json
+{
+  "job_id": "xyz-456-789",
+  "type": "midi_conversion",
+  "status": "succeeded",
+  "audio_id": "550e8400-e29b-41d4-a716-446655440000",
+  "input": {
+    "audio_id": "550e8400-e29b-41d4-a716-446655440000"
+  },
+  "params": {
+    "save_notes": true,
+    "midi_tempo": 120
+  },
+  "output": {
+    "midi": "jobs/xyz-456-789/midi/track.mid",
+    "notes": "jobs/xyz-456-789/midi/track_notes.csv"
+  },
+  "progress": 1.0,
+  "error_message": null,
+  "created_at": "2024-01-01T12:00:00Z",
+  "updated_at": "2024-01-01T12:00:10Z"
 }
 ```
 
@@ -319,7 +369,7 @@ def test_create_job(audio_id):
     
     assert response.status_code == 201
     job = response.json()
-    job_id = job["id"]
+    job_id = job["job_id"]
     print(f"✓ Job created: {job_id}")
     print(f"  Type: {job['type']}")
     print(f"  Status: {job['status']}")
@@ -379,13 +429,32 @@ Run it:
 python test_api.py path/to/your/audio.mp3
 ```
 
-## Testing the Worker Directly
+## Testing with Celery
 
-You can also test the worker with a pre-existing job:
+### Monitor Celery Tasks
 
-1. Create a job via API (or manually insert into database)
-2. Place an audio file in `backend/tmp/jobs/{job_id}/input/`
-3. The worker should pick it up automatically
+Check Redis queue:
+```bash
+# View queued tasks
+redis-cli LLEN celery
+
+# View task keys
+redis-cli KEYS "celery*"
+```
+
+### Monitor with Flower
+
+Install and run Flower for a web-based monitoring interface:
+```bash
+pip install flower
+celery -A app.celery_app flower
+```
+
+Then visit `http://localhost:5555` to see:
+- Active tasks
+- Worker status
+- Task history
+- Task details and results
 
 ## Common Issues and Solutions
 
@@ -413,10 +482,12 @@ python -m app.workers.audio_job_worker
 ### Issue: Worker not processing jobs
 
 **Solution**:
+- Check Redis is running: `redis-cli ping` (should return `PONG`)
+- Verify Celery worker is running and connected to Redis
 - Check worker logs for errors
 - Verify database connection
-- Ensure input file exists in job directory
-- Check file permissions
+- Ensure task is enqueued: `redis-cli LLEN celery`
+- Check audio file exists in `tmp/audio/{audio_id}/`
 
 ### Issue: Separation fails
 

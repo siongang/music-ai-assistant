@@ -7,13 +7,23 @@ Pydantic models for request/response validation and serialization in the API lay
 ## Key Components
 
 - **`job.py`**: Job-related schemas (request/response models)
+- **`audio.py`**: Audio-related schemas (request/response models)
 
 ## Current Schemas
 
+### Audio Schemas
+
+- **`AudioResponse`**: Response schema for audio upload
+  - Returns `audio_id` and `filename` after upload
+
 ### Job Schemas
 
-- Request schemas: For validating incoming data (if needed)
-- Response schemas: For serializing API responses (`JobResponse`)
+- **`JobCreate`**: Request schema for job creation
+  - Validates `type`, `input` (with `audio_id`), and optional `params`
+- **`JobResponse`**: Response schema for job information
+  - Returns job status, progress, output, and metadata
+- **`JobInput`**: Input data schema (contains `audio_id`)
+- **`JobParams`**: Job parameters schema (model selection, etc.)
 
 ## Important Notes
 

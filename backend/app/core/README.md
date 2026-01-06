@@ -17,11 +17,33 @@ Central location for application-wide constants and core functionality.
 
 ## Current Constants
 
-- `AUDIO_EXTENSIONS`: Supported audio file extensions
+### Audio Processing
+- `AUDIO_EXTENSIONS`: Supported audio file extensions (.mp3, .wav, .flac, .m4a, .ogg, .wma, .aac, .aiff)
 - `DEFAULT_STEM_FORMAT`: Default output format (mp3)
-- `JobStatus`: Job status constants (pending, processing, completed, failed)
-- `STORAGE_ROOT`: Root directory for file storage
-- `JOBS_DIR`, `INPUT_DIR`, `STEMS_DIR`: Directory names
+
+### Job Management
+- `JobStatus`: Job status constants
+  - `QUEUED` / `PENDING`: Job waiting to be processed
+  - `RUNNING` / `PROCESSING`: Job currently processing
+  - `SUCCEEDED` / `COMPLETED`: Job completed successfully
+  - `FAILED`: Job failed with error
+- `JobType`: Job type constants
+  - `STEM_SEPARATION`: Separate audio into stems
+  - `MIDI_CONVERSION`: Convert audio to MIDI
+  - `MELODY_EXTRACTION`: Extract melody from audio (planned)
+  - `CHORD_ANALYSIS`: Analyze chord progressions (planned)
+
+### Storage Configuration
+- `STORAGE_ROOT`: Root directory for file storage (defaults to `backend/tmp`, configurable via env var)
+- `AUDIO_DIR`: Audio files directory ("audio")
+- `JOBS_DIR`: Jobs output directory ("jobs")
+- `INPUT_DIR`: Job input files directory ("input")
+- `STEMS_DIR`: Stem separation output directory ("stems")
+- `MIDI_DIR`: MIDI conversion output directory ("midi")
+
+### File Upload Limits
+- `MAX_FILE_SIZE_MB`: Maximum file size in megabytes (500 MB)
+- `MAX_FILE_SIZE_BYTES`: Maximum file size in bytes
 
 ## Future Improvements
 

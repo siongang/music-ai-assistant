@@ -6,10 +6,15 @@ Individual endpoint modules organized by resource. Each module contains related 
 
 ## Current Endpoints
 
+### `audio.py`
+
+Audio file management endpoints:
+- `POST /api/audio`: Upload an audio file and get an `audio_id`
+
 ### `jobs.py`
 
 Job management endpoints:
-- `POST /api/jobs`: Create a new job and upload audio file
+- `POST /api/jobs`: Create a new job using an existing `audio_id`
 - `GET /api/jobs/{job_id}`: Get job status by ID
 
 ## Structure

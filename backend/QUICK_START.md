@@ -109,11 +109,10 @@ Visit `http://localhost:5555` to monitor workers and tasks.
 
 **Option A: Use Swagger UI**
 1. Open http://localhost:8000/docs
-2. Click `POST /api/jobs`
-3. Click "Try it out"
-4. Upload an audio file
-5. Check the response for `job_id`
-6. Use `GET /api/jobs/{job_id}` to check status
+2. First, upload audio: Click `POST /api/audio`, upload a file, get `audio_id`
+3. Then create job: Click `POST /api/jobs`, use the `audio_id` from step 2
+4. Check the response for `job_id`
+5. Use `GET /api/jobs/{job_id}` to check status
 
 **Option B: Use Test Script**
 ```bash
@@ -122,11 +121,21 @@ python test_api.py path/to/your/audio.mp3
 
 **Option C: Use curl**
 ```bash
-# Create job
-curl -X POST "http://localhost:8000/api/jobs" \
+# 1. Upload audio
+curl -X POST "http://localhost:8000/api/audio" \
   -F "file=@your_audio.mp3"
+# Save the audio_id from response
 
-# Check status (replace {job_id} with actual ID)
+# 2. Create job (replace audio_id with actual ID)
+curl -X POST "http://localhost:8000/api/jobs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "stem_separation",
+    "input": {"audio_id": "YOUR_AUDIO_ID"},
+    "params": {}
+  }'
+
+# 3. Check status (replace {job_id} with actual ID)
 curl "http://localhost:8000/api/jobs/{job_id}"
 ```
 
@@ -157,7 +166,7 @@ curl "http://localhost:8000/api/jobs/{job_id}"
 - Make sure Redis is running: `redis-cli ping`
 - Check Celery worker is running and connected to Redis
 - Look for errors in worker terminal
-- Verify input file exists in `backend/tmp/jobs/{job_id}/input/`
+- Verify audio file exists in `backend/tmp/audio/{audio_id}/`
 - Check if task is enqueued: `redis-cli LLEN celery`
 
 **Separation fails?**
@@ -171,8 +180,10 @@ curl "http://localhost:8000/api/jobs/{job_id}"
 - **API Server**: http://localhost:8000 (handles HTTP requests)
 - **Redis**: Message broker (queues tasks for processing)
 - **Celery Worker**: Background process (processes jobs from Redis queue)
-- **Database**: Local PostgreSQL (stores job status) - or SQLite
-- **Storage**: `backend/tmp/` directory (stores audio files)
+- **Database**: Local PostgreSQL (stores job status and audio metadata) - or SQLite
+- **Storage**: `backend/tmp/` directory (stores uploaded audio and job outputs)
+  - `tmp/audio/` - Uploaded audio files
+  - `tmp/jobs/` - Job output files (stems, MIDI)
 
 ## Next Steps
 
