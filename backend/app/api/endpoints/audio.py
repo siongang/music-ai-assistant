@@ -3,10 +3,13 @@ Audio API endpoints.
 
 This module provides HTTP endpoints for audio file management:
 - POST /audio: Upload an audio file
+- GET /audio/{audio_id}/download: Download an audio file
+- GET /files/{file_path:path}: Download any file from storage
 """
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status as http_status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from uuid import uuid4
+from uuid import uuid4, UUID
 from pathlib import Path
 import logging
 
@@ -137,4 +140,118 @@ def upload_audio(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save file: {str(e)}"
         )
+
+
+@router.get("/{audio_id}/download")
+def download_audio(
+    audio_id: UUID,
+    audio_service: AudioService = Depends(get_audio_service),
+    storage: LocalStorage = Depends(get_storage)
+):
+    """
+    Download an uploaded audio file by its audio_id.
+    
+    Args:
+        audio_id: UUID of the audio to download
+        audio_service: Injected AudioService instance
+        storage: Injected LocalStorage instance
+        
+    Returns:
+        FileResponse with the audio file
+        
+    Raises:
+        HTTPException: If audio not found (404) or file doesn't exist (404)
+    """
+    logger.debug(f"Download request for audio: {audio_id}")
+    
+    # Get audio from database
+    audio_path = audio_service.get_audio_path(audio_id)
+    if not audio_path:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Audio {audio_id} not found"
+        )
+    
+    # Build full path
+    full_path = Path(STORAGE_ROOT) / audio_path
+    
+    # Check if file exists
+    if not full_path.exists() or not full_path.is_file():
+        logger.error(f"Audio file not found on disk: {full_path}")
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Audio file not found on disk"
+        )
+    
+    # Return file for download
+    return FileResponse(
+        path=str(full_path),
+        filename=full_path.name,
+        media_type='audio/mpeg'  # Generic audio type
+    )
+
+
+@router.get("/files/{file_path:path}")
+def download_file(file_path: str):
+    """
+    Download any file from storage by its relative path.
+    
+    This is a generic endpoint for downloading job outputs (stems, MIDI, etc.)
+    
+    Args:
+        file_path: Relative path to file in storage (e.g., "jobs/xxx/stems/track.vocals.mp3")
+        
+    Returns:
+        FileResponse with the requested file
+        
+    Raises:
+        HTTPException: If file doesn't exist (404) or path is invalid (400)
+        
+    Example:
+        GET /api/audio/files/jobs/abc-123/stems/track.vocals.mp3
+        GET /api/audio/files/jobs/abc-123/midi/track.mid
+    
+    Security Note:
+        This endpoint validates that the requested path is within the storage root
+        to prevent path traversal attacks.
+    """
+    logger.debug(f"Download request for file: {file_path}")
+    
+    # Build full path
+    full_path = (Path(STORAGE_ROOT) / file_path).resolve()
+    storage_root = Path(STORAGE_ROOT).resolve()
+    
+    # Security: Ensure the resolved path is within storage root (prevent path traversal)
+    try:
+        full_path.relative_to(storage_root)
+    except ValueError:
+        logger.warning(f"Path traversal attempt detected: {file_path}")
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path"
+        )
+    
+    # Check if file exists
+    if not full_path.exists() or not full_path.is_file():
+        logger.warning(f"File not found: {full_path}")
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"File not found"
+        )
+    
+    # Determine media type based on extension
+    media_type = 'application/octet-stream'  # Default
+    if full_path.suffix.lower() in ['.mp3', '.wav', '.flac', '.ogg', '.m4a']:
+        media_type = 'audio/mpeg'
+    elif full_path.suffix.lower() in ['.mid', '.midi']:
+        media_type = 'audio/midi'
+    elif full_path.suffix.lower() == '.csv':
+        media_type = 'text/csv'
+    
+    # Return file for download
+    return FileResponse(
+        path=str(full_path),
+        filename=full_path.name,
+        media_type=media_type
+    )
 
