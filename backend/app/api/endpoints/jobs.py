@@ -4,9 +4,11 @@ Jobs API endpoints.
 This module provides HTTP endpoints for job management:
 - POST /jobs: Create a new job
 - GET /jobs/{job_id}: Get job status by ID
+- GET /jobs: List all jobs (paginated)
 """
-from fastapi import APIRouter, Depends, HTTPException, status as http_status
+from fastapi import APIRouter, Depends, HTTPException, Query, status as http_status
 from sqlalchemy.orm import Session
+from typing import List, Optional
 from uuid import UUID, uuid4
 import logging
 
@@ -182,3 +184,49 @@ def get_job(
         )
     
     return _build_job_response(job)
+
+
+@router.get("", response_model=List[JobResponse])
+def list_jobs(
+    status: Optional[str] = Query(None, description="Filter by job status"),
+    job_type: Optional[str] = Query(None, description="Filter by job type"),
+    limit: int = Query(10, ge=1, le=100, description="Number of jobs to return"),
+    offset: int = Query(0, ge=0, description="Number of jobs to skip"),
+    db: Session = Depends(get_db)
+):
+    """
+    List all jobs with optional filtering and pagination.
+    
+    Args:
+        status: Optional status filter (queued, running, succeeded, failed)
+        job_type: Optional type filter (stem_separation, midi_conversion, etc.)
+        limit: Maximum number of jobs to return (1-100, default 10)
+        offset: Number of jobs to skip for pagination
+        db: Database session
+        
+    Returns:
+        List of JobResponse objects
+        
+    Example:
+        GET /api/jobs?status=succeeded&limit=20&offset=0
+        GET /api/jobs?job_type=stem_separation
+    """
+    logger.debug(f"Listing jobs: status={status}, type={job_type}, limit={limit}, offset={offset}")
+    
+    # Import Job model
+    from app.models.job import Job
+    
+    # Build query
+    query = db.query(Job)
+    
+    # Apply filters
+    if status:
+        query = query.filter(Job.status == status)
+    if job_type:
+        query = query.filter(Job.type == job_type)
+    
+    # Apply pagination and ordering (newest first)
+    jobs = query.order_by(Job.created_at.desc()).limit(limit).offset(offset).all()
+    
+    # Convert to response format
+    return [_build_job_response(job) for job in jobs]
