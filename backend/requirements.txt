@@ -9,6 +9,8 @@ sqlalchemy
 psycopg2-binary
 pydantic
 python-multipart
+jsonschema
+openai
 
 # demucs
 # IMPORTANT: PyTorch must be installed separately BEFORE installing other packages!
