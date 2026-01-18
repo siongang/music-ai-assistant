@@ -5,8 +5,44 @@ from sqlalchemy.orm import Session as DBSession
 from app.models.session import Session
 from app.models.agent_step import AgentStep
 import logging
+import json
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_json_serializable(data: Any) -> Any:
+    """
+    Ensure data is JSON serializable by converting SDK objects to primitives.
+    
+    Args:
+        data: Data to validate/convert
+        
+    Returns:
+        JSON-serializable version of data
+        
+    Raises:
+        TypeError: If data cannot be made serializable
+    """
+    if isinstance(data, (str, int, float, bool, type(None))):
+        return data
+    
+    if isinstance(data, dict):
+        return {k: _ensure_json_serializable(v) for k, v in data.items()}
+    
+    if isinstance(data, (list, tuple)):
+        return [_ensure_json_serializable(item) for item in data]
+    
+    # Handle objects with model_dump (Pydantic models)
+    if hasattr(data, "model_dump"):
+        return _ensure_json_serializable(data.model_dump())
+    
+    # Handle objects with __dict__ (but not SDK objects we want to avoid)
+    if hasattr(data, "__dict__") and not hasattr(data, "text"):
+        return _ensure_json_serializable(data.__dict__)
+    
+    # Last resort: convert to string
+    logger.warning(f"Converting non-serializable object to string: {type(data)}")
+    return str(data)
 
 
 class SessionService:
@@ -31,7 +67,7 @@ class SessionService:
         self.db.add(session)
         self.db.commit()
         self.db.refresh(session)
-        logger.info(f"Created session: {session.id}")
+        logger.info(f"[SESSION] Created new session | session_id={session.id}")
         return session
     
     def get_session(self, session_id: UUID) -> Optional[Session]:
@@ -62,7 +98,9 @@ class SessionService:
             self.db.add(session)
             self.db.commit()
             self.db.refresh(session)
-            logger.info(f"Created session: {session_id}")
+            logger.info(f"[SESSION] Created session (get_or_create) | session_id={session_id}")
+        else:
+            logger.debug(f"[SESSION] Retrieved existing session | session_id={session_id}")
         return session
     
     def add_step(
@@ -87,15 +125,26 @@ class SessionService:
             .filter(AgentStep.session_id == session_id)\
             .count()
         
+        # Ensure content is JSON serializable before storing
+        try:
+            normalized_content = _ensure_json_serializable(content)
+            # Verify it's actually serializable
+            json.dumps(normalized_content)
+        except (TypeError, ValueError) as e:
+            logger.error(f"[SESSION] Content not JSON serializable | session_id={session_id} | step_type={step_type} | error={e}")
+            # Fallback: convert to string representation
+            normalized_content = {"error": "Failed to serialize content", "raw": str(content)}
+        
         step = AgentStep(
             session_id=session_id,
             step_number=step_count + 1,
             step_type=step_type,
-            content=content
+            content=normalized_content
         )
         self.db.add(step)
         self.db.commit()
         self.db.refresh(step)
+        logger.debug(f"[SESSION] Added step | session_id={session_id} | step_type={step_type} | step_number={step.step_number}")
         return step
     
     def get_conversation_history(
@@ -161,6 +210,7 @@ class SessionService:
                     "content": step.content.get("content", "")
                 })
         
+        logger.debug(f"[SESSION] Retrieved messages for LLM | session_id={session_id} | message_count={len(messages)}")
         return messages
     
     def set_primary_audio(self, session_id: UUID, audio_id: str, filename: Optional[str] = None):
@@ -185,7 +235,7 @@ class SessionService:
             session.session_metadata["primary_audio_filename"] = filename
         
         self.db.commit()
-        logger.info(f"Set primary audio for session {session_id}: {audio_id}")
+        logger.info(f"[SESSION] Set primary audio | session_id={session_id} | audio_id={audio_id} | filename={filename}")
     
     def get_primary_audio(self, session_id: UUID) -> Optional[Dict[str, str]]:
         """

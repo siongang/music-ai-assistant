@@ -1,7 +1,8 @@
-"""Agent executor - main agent runtime loop."""
+"""Agent executor - main agent runtime loop using Responses API."""
 from uuid import UUID
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
+import json
 import logging
 
 from app.agent.llm_client import LLMClient, LLMResponse
@@ -21,7 +22,7 @@ class AgentResponse:
 
 class AgentExecutor:
     """
-    Main agent runtime.
+    Main agent runtime using event-based Responses API.
     
     Orchestrates:
     - User message processing
@@ -73,14 +74,38 @@ When users ask to process audio, use the appropriate tool and explain what's hap
         self.sessions = session_service
         self.max_steps = max_steps
     
+    def _build_input_items(
+        self,
+        conversation_messages: List[Dict[str, str]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Build initial input items for Responses API from conversation history.
+        
+        Args:
+            conversation_messages: List of messages from session
+        
+        Returns:
+            List of input items for Responses API
+        """
+        input_items = []
+        
+        # Add conversation messages
+        for msg in conversation_messages:
+            input_items.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
+        
+        return input_items
+    
     def process_message(self, session_id: UUID, user_message: str) -> AgentResponse:
         """
         Process user message and return agent response.
         
-        This is the main agent loop:
+        This is the main agent loop using Responses API:
         1. Load session context
         2. Add user message to history
-        3. Run agent reasoning loop (up to max_steps)
+        3. Run event-based agent loop (up to max_steps)
         4. Return final response
         
         Args:
@@ -90,10 +115,11 @@ When users ask to process audio, use the appropriate tool and explain what's hap
         Returns:
             AgentResponse with final message
         """
-        logger.info(f"Processing message for session {session_id}")
+        logger.info(f"[AGENT] Processing message | session={session_id} | message='{user_message[:100]}...'")
         
         # Ensure session exists
         session = self.sessions.get_or_create_session(session_id)
+        logger.debug(f"[AGENT] Session ready | session={session_id} | created={session.created_at}")
         
         # Log user message
         self.sessions.add_step(
@@ -103,66 +129,69 @@ When users ask to process audio, use the appropriate tool and explain what's hap
         )
         
         # Get conversation history for LLM
-        # Note: get_messages_for_llm already includes the user message we just logged,
-        # so we don't need to append it again
         conversation_messages = self.sessions.get_messages_for_llm(session_id)
-        
-        # Agent loop
-        step_count = 0
-        tool_results = []  # Track tool results for this turn
+        logger.info(f"[AGENT] Conversation history | session={session_id} | message_count={len(conversation_messages)}")
         
         # Get primary audio for this session
         primary_audio = self.sessions.get_primary_audio(session_id)
+        if primary_audio:
+            logger.info(f"[AGENT] Primary audio context | session={session_id} | audio_id={primary_audio['audio_id']} | filename={primary_audio.get('filename', 'unknown')}")
+        else:
+            logger.info(f"[AGENT] No primary audio | session={session_id}")
+        
+        # Build system prompt with primary audio context
+        system_prompt = self.SYSTEM_PROMPT
+        if primary_audio:
+            audio_context = "\n\n**Active Audio Context:**\n"
+            audio_context += f"- audio_id: {primary_audio['audio_id']}\n"
+            if "filename" in primary_audio:
+                audio_context += f"- filename: {primary_audio['filename']}\n"
+            audio_context += "\nWhen the user refers to 'the song', 'the audio', 'that file', 'it', or similar, "
+            audio_context += f"they mean this audio (audio_id: {primary_audio['audio_id']}). "
+            audio_context += "Use this audio_id automatically in tool calls unless the user explicitly provides a different one."
+            system_prompt = system_prompt + audio_context
+        else:
+            # No primary audio set - inform LLM to ask user to upload
+            system_prompt = system_prompt + "\n\n**Note:** No audio file has been uploaded for this session yet. If the user asks to process audio, ask them to upload an audio file first."
+        
+        # Agent loop with event-based Responses API
+        step_count = 0
+        tool_results = []  # Track tool results for metadata
+        input_items = self._build_input_items(conversation_messages)
+        
+        # Get tool schemas
+        tool_schemas = self.tools.get_tool_schemas()
+        logger.info(f"[AGENT] Available tools | session={session_id} | tool_count={len(tool_schemas)} | tools={[t.get('function', {}).get('name') for t in tool_schemas]}")
         
         while step_count < self.max_steps:
             step_count += 1
-            logger.debug(f"Agent step {step_count}/{self.max_steps}")
+            logger.info(f"[AGENT] Step {step_count}/{self.max_steps} | session={session_id}")
             
-            # Build system prompt with primary audio context
-            system_prompt = self.SYSTEM_PROMPT
-            if primary_audio:
-                audio_context = "\n\n**Active Audio Context:**\n"
-                audio_context += f"- audio_id: {primary_audio['audio_id']}\n"
-                if "filename" in primary_audio:
-                    audio_context += f"- filename: {primary_audio['filename']}\n"
-                audio_context += "\nWhen the user refers to 'the song', 'the audio', 'that file', 'it', or similar, "
-                audio_context += f"they mean this audio (audio_id: {primary_audio['audio_id']}). "
-                audio_context += "Use this audio_id automatically in tool calls unless the user explicitly provides a different one."
-                system_prompt = system_prompt + audio_context
-            else:
-                # No primary audio set - inform LLM to ask user to upload
-                system_prompt = system_prompt + "\n\n**Note:** No audio file has been uploaded for this session yet. If the user asks to process audio, ask them to upload an audio file first."
-            
-            # Build messages with system prompt
-            messages = [{"role": "system", "content": system_prompt}]
-            messages.extend(conversation_messages)
-            
-            # Add tool results if any
-            if tool_results:
-                tool_summary = "Tool results:\n" + "\n".join([
-                    f"- {tr['tool']}: {tr['result']}"
-                    for tr in tool_results
-                ])
-                messages.append({
-                    "role": "user",
-                    "content": tool_summary
-                })
-            
-            # Get next action from LLM
-            llm_response = self.llm.chat(
-                messages=messages,
-                tools=self.tools.get_tool_schemas(),
-                temperature=0.7
+            # Call Responses API
+            logger.debug(f"[AGENT] Calling LLM | session={session_id} | step={step_count} | input_items={len(input_items)}")
+            llm_response = self.llm.run(
+                input_items=input_items,
+                tools=tool_schemas,
+                instructions=system_prompt
             )
+            logger.info(f"[AGENT] LLM response received | session={session_id} | step={step_count} | output_items={len(llm_response.output)} | has_tool_calls={llm_response.has_tool_calls} | has_content={llm_response.has_content}")
             
-            # Handle response
-            if llm_response.tool_calls:
-                # Execute tools
-                for tool_call in llm_response.tool_calls:
-                    tool_name = tool_call["name"]
-                    tool_args = tool_call["arguments"]
+            # Add response output to input_items for next iteration
+            input_items.extend(llm_response.output)
+            
+            # Process output events
+            has_tool_calls = False
+            final_content = None
+            
+            for item in llm_response.output:
+                if item["type"] == "function_call":
+                    has_tool_calls = True
+                    call_id = item["call_id"]
+                    tool_name = item["name"]
+                    tool_args = item["arguments"]
                     
-                    logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+                    logger.info(f"[AGENT] Tool call | session={session_id} | step={step_count} | tool={tool_name} | call_id={call_id}")
+                    logger.debug(f"[AGENT] Tool arguments | session={session_id} | tool={tool_name} | args={json.dumps(tool_args, indent=2)}")
                     
                     # Log tool call
                     self.sessions.add_step(
@@ -170,13 +199,26 @@ When users ask to process audio, use the appropriate tool and explain what's hap
                         step_type="tool_call",
                         content={
                             "tool": tool_name,
-                            "arguments": tool_args
+                            "arguments": tool_args,
+                            "call_id": call_id
                         }
                     )
                     
                     # Execute tool
                     try:
+                        logger.info(f"[AGENT] Executing tool | session={session_id} | tool={tool_name} | call_id={call_id} | args={json.dumps(tool_args)}")
                         result = self.tools.execute(tool_name, **tool_args)
+                        
+                        # Extract key information from result for logging
+                        job_id = result.get("job_id") if isinstance(result, dict) else None
+                        status = result.get("status") if isinstance(result, dict) else None
+                        
+                        if job_id:
+                            logger.info(f"[AGENT] Tool executed successfully | session={session_id} | tool={tool_name} | call_id={call_id} | job_id={job_id} | status={status}")
+                        else:
+                            logger.info(f"[AGENT] Tool executed successfully | session={session_id} | tool={tool_name} | call_id={call_id} | result_keys={list(result.keys()) if isinstance(result, dict) else 'N/A'}")
+                        
+                        logger.debug(f"[AGENT] Tool result (full) | session={session_id} | tool={tool_name} | result={json.dumps(result, indent=2)}")
                         
                         # Log result
                         self.sessions.add_step(
@@ -184,19 +226,28 @@ When users ask to process audio, use the appropriate tool and explain what's hap
                             step_type="tool_result",
                             content={
                                 "tool": tool_name,
-                                "result": result
+                                "result": result,
+                                "call_id": call_id
                             }
                         )
                         
-                        # Track for next LLM call
+                        # Append function_call_output to input_items for continuation
+                        input_items.append({
+                            "type": "function_call_output",
+                            "call_id": call_id,
+                            "output": json.dumps(result)
+                        })
+                        
+                        # Track for metadata
                         tool_results.append({
                             "tool": tool_name,
-                            "result": result
+                            "result": result,
+                            "call_id": call_id
                         })
                         
                     except Exception as e:
                         error_msg = str(e)
-                        logger.error(f"Tool {tool_name} failed: {error_msg}")
+                        logger.error(f"[AGENT] Tool execution failed | session={session_id} | tool={tool_name} | call_id={call_id} | error={error_msg}", exc_info=True)
                         
                         # Log error
                         self.sessions.add_step(
@@ -204,52 +255,64 @@ When users ask to process audio, use the appropriate tool and explain what's hap
                             step_type="error",
                             content={
                                 "tool": tool_name,
-                                "error": error_msg
+                                "error": error_msg,
+                                "call_id": call_id
                             }
                         )
                         
-                        # Track error for next LLM call
+                        # Append error as function_call_output
+                        input_items.append({
+                            "type": "function_call_output",
+                            "call_id": call_id,
+                            "output": json.dumps({"error": error_msg})
+                        })
+                        
+                        # Track for metadata
                         tool_results.append({
                             "tool": tool_name,
-                            "error": error_msg
+                            "error": error_msg,
+                            "call_id": call_id
                         })
                 
-                # Continue loop to let LLM respond to user
+                elif item["type"] == "message":
+                    # Extract content from message (should already be normalized to string by LLM client)
+                    final_content = item.get("content", "")
+                    # Safety check: ensure it's a string (not an SDK object)
+                    if not isinstance(final_content, str):
+                        logger.warning(f"[AGENT] Content is not a string, converting | session={session_id} | type={type(final_content)}")
+                        final_content = str(final_content)
+                    logger.info(f"[AGENT] LLM message received | session={session_id} | step={step_count} | content_length={len(final_content)}")
+                    logger.debug(f"[AGENT] Message content | session={session_id} | content='{final_content[:200]}...'")
+            
+            # If we have tool calls, continue the loop
+            if has_tool_calls:
+                logger.info(f"[AGENT] Continuing loop (tool calls pending) | session={session_id} | step={step_count}")
                 continue
             
-            elif llm_response.content:
-                # LLM has final response for user
-                response_text = llm_response.content
-                
+            # If we have final content, return it
+            if final_content:
+                logger.info(f"[AGENT] Final response ready | session={session_id} | steps={step_count} | tools_used={[tr['tool'] for tr in tool_results]}")
                 # Log agent response
                 self.sessions.add_step(
                     session_id,
                     step_type="agent_response",
                     content={
                         "role": "assistant",
-                        "content": response_text
+                        "content": final_content
                     }
                 )
                 
                 return AgentResponse(
-                    message=response_text,
+                    message=final_content,
                     done=True,
                     metadata={
                         "steps": step_count,
                         "tools_used": [tr["tool"] for tr in tool_results]
                     }
                 )
-            
-            else:
-                # Unexpected response
-                logger.error(f"Unexpected LLM response: {llm_response}")
-                return AgentResponse(
-                    message="I encountered an error processing your request.",
-                    done=True
-                )
         
         # Max steps reached
-        logger.warning(f"Max steps ({self.max_steps}) reached for session {session_id}")
+        logger.warning(f"[AGENT] Max steps reached | session={session_id} | max_steps={self.max_steps}")
         return AgentResponse(
             message="I need more steps to complete this task. Please try rephrasing your request.",
             done=False,

@@ -49,16 +49,20 @@ class Tool(ABC):
     
     def to_function_schema(self) -> Dict[str, Any]:
         """
-        Convert tool to OpenAI function calling schema.
+        Convert tool to OpenAI Responses API schema (flat format).
         
         Returns:
-            Dict in OpenAI function calling format
+            Dict in Responses API format:
+            {
+                "type": "function",
+                "name": "...",
+                "description": "...",
+                "parameters": {...}
+            }
         """
         return {
             "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters
-            }
+            "name": self.name,
+            "description": self.description,
+            "parameters": self.parameters
         }

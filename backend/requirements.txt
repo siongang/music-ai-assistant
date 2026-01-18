@@ -11,6 +11,7 @@ pydantic
 python-multipart
 jsonschema
 openai
+python-dotenv
 
 # demucs
 # IMPORTANT: PyTorch must be installed separately BEFORE installing other packages!

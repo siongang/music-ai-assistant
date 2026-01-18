@@ -4,11 +4,21 @@ FastAPI application entry point.
 This module creates and configures the FastAPI application instance.
 """
 import logging
+from pathlib import Path
 from fastapi import FastAPI
+from dotenv import load_dotenv
 
 from app.api.router import api_router
 from app.db.base import Base
 from app.db.session import engine
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
+
+# Import all models so they're registered with SQLAlchemy
+# This ensures tables are created on startup
+from app.models import Session, AgentStep, Job, Audio  # noqa: F401
 
 # Configure logging
 logging.basicConfig(
