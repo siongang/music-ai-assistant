@@ -6,57 +6,29 @@ Individual endpoint modules organized by resource. Each module contains related 
 
 ## Current Endpoints
 
-### `audio.py`
-
-Audio file management endpoints:
-- `POST /api/audio`: Upload an audio file and get an `audio_id`
-
-### `jobs.py`
-
-Job management endpoints:
-- `POST /api/jobs`: Create a new job using an existing `audio_id`
-- `GET /api/jobs/{job_id}`: Get job status by ID
+- **`audio.py`**: Audio file upload (`POST /api/audio`)
+- **`jobs.py`**: Job management (`POST /api/jobs`, `GET /api/jobs/{job_id}`)
+- **`chat.py`**: LLM agent endpoints (`POST /api/chat/message`, `POST /api/chat/sessions`)
 
 ## Structure
 
 Each endpoint module:
-1. Defines dependency functions (e.g., `get_job_service()`, `get_storage()`)
-2. Creates an `APIRouter` instance
-3. Defines route handlers with proper decorators
-4. Uses dependency injection for services
-5. Returns Pydantic schema responses
+- Defines dependency functions for services
+- Creates `APIRouter` instance
+- Uses FastAPI dependency injection
+- Returns Pydantic schema responses
 
 ## Important Notes
 
-1. **Dependency Functions**: Create service instances per request (FastAPI manages lifecycle)
-2. **Error Handling**: Always use `HTTPException` with appropriate status codes
-3. **File Validation**: Check file extensions and sizes before processing
-4. **Logging**: Log important operations (job creation, errors, etc.)
-5. **Type Hints**: Use proper type hints for better IDE support and validation
-
-## Example Pattern
-
-```python
-router = APIRouter(prefix="/jobs", tags=["jobs"])
-
-def get_service(db: Session = Depends(get_db)):
-    return Service(db)
-
-@router.post("", response_model=ResponseSchema)
-def create_resource(
-    data: RequestSchema,
-    service: Service = Depends(get_service)
-):
-    # Handle request
-    return result
-```
+1. **Dependency Injection**: Services created per request (FastAPI manages lifecycle)
+2. **Error Handling**: Use `HTTPException` with appropriate status codes
+3. **File Validation**: Check extensions and sizes before processing
+4. **Type Hints**: Required for validation and IDE support
 
 ## Future Improvements
 
-- [ ] Add more job operations (cancel, retry, delete)
-- [ ] Add job listing with filters and pagination
-- [ ] Add file download endpoints for stems
-- [ ] Add WebSocket endpoints for real-time updates
-- [ ] Add batch operations
-- [ ] Add job statistics endpoint
-- [ ] Add user management endpoints (when auth is added)
+- [ ] Job operations (cancel, retry, delete)
+- [ ] Job listing with filters and pagination
+- [ ] File download endpoints
+- [ ] WebSocket for real-time updates
+- [ ] Batch operations

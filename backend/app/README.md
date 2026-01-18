@@ -6,71 +6,41 @@ Main application package containing all backend components organized by layer.
 
 ## Structure
 
-```
-app/
-├── api/              # API endpoints and routing
-├── audio_engine/     # Audio processing (Demucs, Basic Pitch)
-├── core/            # Core constants and configuration
-├── db/              # Database configuration and session management
-├── models/          # SQLAlchemy database models
-├── schemas/         # Pydantic request/response schemas
-├── services/        # Business logic services
-├── storage/         # Storage abstraction layer
-├── tasks/           # Celery tasks for background processing (current)
-├── utils/           # Utility functions (MIDI, file operations)
-├── workers/         # Legacy workers (deprecated)
-├── celery_app.py    # Celery application configuration
-└── main.py          # FastAPI application entry point
-```
+- **`api/`**: HTTP endpoints and routing
+- **`agent/`**: LLM agent framework (Responses API, tool orchestration)
+- **`audio_engine/`**: Audio processing (Demucs, Basic Pitch)
+- **`core/`**: Constants and configuration
+- **`db/`**: Database configuration and session management
+- **`models/`**: SQLAlchemy database models
+- **`schemas/`**: Pydantic request/response schemas
+- **`services/`**: Business logic services
+- **`storage/`**: Storage abstraction layer
+- **`tasks/`**: Celery tasks for background processing
+- **`utils/`**: Utility functions
+- **`workers/`**: Legacy workers (deprecated)
 
 ## Architecture Layers
 
-1. **API Layer** (`api/`): HTTP endpoints, request/response handling
-2. **Service Layer** (`services/`): Business logic and orchestration
-3. **Storage Layer** (`storage/`): File storage abstraction
-4. **Audio Engine** (`audio_engine/`): Audio processing (Demucs for stems, Basic Pitch for MIDI)
-5. **Utils** (`utils/`): Utility functions for file operations, MIDI handling
-6. **Database Layer** (`db/`, `models/`): Data persistence
-7. **Task Layer** (`tasks/`): Celery tasks for asynchronous job processing (current)
-8. **Worker Layer** (`workers/`): Legacy workers (deprecated)
+1. **API Layer**: HTTP endpoints, request/response handling
+2. **Agent Layer**: LLM agent with tool orchestration (Responses API)
+3. **Service Layer**: Business logic and orchestration
+4. **Storage Layer**: File storage abstraction
+5. **Audio Engine**: Audio processing (Demucs, Basic Pitch)
+6. **Database Layer**: Data persistence
+7. **Task Layer**: Celery tasks for async processing
 
 ## Data Flow
 
-```
-Client Request
-  ↓
-API Endpoint (api/)
-  ↓
-Service Layer (services/)
-  ↓
-Celery Task (tasks/) - enqueued to Redis
-  ↓
-Celery Worker (processes task)
-  ↓
-Storage / Audio Engine / Database
-  ↓
-Response / Job Status Update
-```
+Client Request → API Endpoint → Service/Agent Layer → Celery Task → Storage/Audio Engine/Database → Response
 
 ## Key Principles
 
-1. **Separation of Concerns**: Each layer has a specific responsibility
-2. **Dependency Injection**: FastAPI's `Depends()` for services and sessions
-3. **Abstraction**: Storage and services use interfaces/abstract classes
-4. **Type Safety**: Type hints throughout for better IDE support
-5. **Error Handling**: Proper error handling and logging at each layer
+1. **Separation of Concerns**: Each layer has specific responsibility
+2. **Dependency Injection**: FastAPI's `Depends()` for services
+3. **Abstraction**: Storage and services use interfaces
+4. **Type Safety**: Type hints throughout
+5. **Error Handling**: Proper error handling at each layer
 
 ## Entry Point
 
 `main.py`: FastAPI application instance, router registration, database initialization
-
-## Future Improvements
-
-- [ ] Add authentication/authorization layer
-- [ ] Add caching layer
-- [ ] Add monitoring/metrics layer
-- [ ] Add event system for decoupled communication
-- [ ] Add plugin system for extensibility
-- [ ] Add configuration management system
-- [ ] Add health check system
-- [ ] Add API versioning

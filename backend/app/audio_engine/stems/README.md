@@ -17,35 +17,25 @@ Wrapper around the Demucs library for separating audio files into individual ste
 
 ## Important Notes
 
-1. **Model Loading**: Model is loaded on first use (lazy loading)
+1. **Model Loading**: Model loaded on first use (lazy loading)
 2. **Device Selection**: Auto-detects CUDA if available, falls back to CPU
 3. **Memory**: Model and audio tensors can be large - monitor memory usage
-4. **Thread Safety**: Demucs separator is not thread-safe - create separate instances per thread
-5. **Error Handling**: Wraps Demucs errors in `RuntimeError` for consistent error handling
+4. **Thread Safety**: Not thread-safe - create separate instances per thread
+5. **Error Handling**: Wraps Demucs errors in `RuntimeError`
 
 ## Configuration
 
-Default parameters:
-- `model`: "htdemucs" (high-quality model)
-- `device`: None (auto-detect)
-- `shifts`: 1 (number of random shifts for quality)
-- `overlap`: 0.25 (segment overlap)
-- `split`: True (split long audio)
+Default parameters: `model` ("htdemucs"), `device` (auto-detect), `shifts` (1), `overlap` (0.25), `split` (True)
 
 ## Future Improvements
 
-- [ ] Add model selection via configuration
-- [ ] Add device selection via environment variable
-- [ ] Add progress callbacks for long separations
-- [ ] Add support for different Demucs models
-- [ ] Add caching for model weights
-- [ ] Add batch processing support
-- [ ] Add quality/speed tradeoff options
-- [ ] Add custom model loading
-- [ ] Add memory-efficient processing for large files
+- [ ] Model selection via configuration
+- [ ] Progress callbacks
+- [ ] Support for different Demucs models
+- [ ] Model weight caching
+- [ ] Batch processing support
 
 ## Dependencies
 
-- `demucs.api.Separator`: Main Demucs API
-- `torch`: PyTorch tensors
-- `pathlib.Path`: File path handling
+- **Demucs**: Audio source separation library
+- **PyTorch**: Deep learning framework

@@ -57,7 +57,7 @@ python -c "import os; from dotenv import load_dotenv; load_dotenv(); print('Key 
 
 **Symptom:** Error about `responses` endpoint not existing or 404.
 
-**Problem:** The Responses API might not be available in your OpenAI account or SDK version.
+**Problem:** The Responses API requires a compatible model (e.g., gpt-5) and may require beta access.
 
 **Check:**
 1. Verify OpenAI SDK version:
@@ -66,15 +66,19 @@ python -c "import os; from dotenv import load_dotenv; load_dotenv(); print('Key 
    ```
    Should be recent (>= 1.0.0)
 
-2. Check if Responses API is available:
+2. Check model name:
+   - Default: `gpt-5`
+   - Can be set via `OPENAI_MODEL` or `LLM_MODEL` env var
+   - Model must support Responses API
+
+3. Verify API access:
    ```python
    from openai import OpenAI
    client = OpenAI()
-   # Try to see if responses endpoint exists
-   # This might require beta access
+   # Try calling responses.create() - may require beta access
    ```
 
-**Alternative:** If Responses API isn't available, we may need to switch to standard Chat Completions API.
+**Note:** The agent framework is designed for Responses API (event-based). If you need to use a different API, you'll need to implement a different LLM client.
 
 ### Issue 4: Timeout Errors
 
@@ -187,12 +191,15 @@ Create a test script:
 ```python
 from app.agent.llm_client import create_llm_client
 
-client = create_llm_client(provider="openai", model="gpt-4o")
+client = create_llm_client(provider="openai", model="gpt-5")
 response = client.run(
     input_items=[{"role": "user", "content": "Hello"}],
     instructions="You are a helpful assistant."
 )
 print(response)
+print(f"Output items: {response.output}")
+print(f"Has tool calls: {response.has_tool_calls}")
+print(f"Has content: {response.has_content}")
 ```
 
 ### Verify Database
