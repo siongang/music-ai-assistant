@@ -228,7 +228,7 @@ STORAGE_ROOT=./tmp
 # LLM (for agent features)
 OPENAI_API_KEY=sk-...
 LLM_PROVIDER=openai
-LLM_MODEL=gpt-4
+LLM_MODEL=gpt-5  # Or OPENAI_MODEL env var
 
 # Agent Configuration
 MAX_AGENT_STEPS=10
@@ -365,12 +365,11 @@ curl http://localhost:8000/api/chat/sessions/770e8400-e29b-41d4-a716-44665544022
 - **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - **START HERE** - Complete system architecture, design decisions, future roadmap
 - **[docs/AGENT.md](./docs/AGENT.md)** - LLM agent framework deep dive
 - **[docs/TOOLS.md](./docs/TOOLS.md)** - Tools system and how to create new tools
-- **[docs/EXECUTION_PLAN.md](./docs/EXECUTION_PLAN.md)** - Step-by-step implementation guide
 
 ### Backend Specific
 - **[backend/README.md](./backend/README.md)** - Backend setup and development
 - **[backend/TESTING.md](./backend/TESTING.md)** - Testing guide
-- **[backend/ARCHITECTURE.md](./backend/ARCHITECTURE.md)** - Backend architecture (legacy, see docs/ARCHITECTURE.md)
+- **[backend/CHAT_TESTING_GUIDE.md](./backend/CHAT_TESTING_GUIDE.md)** - LLM chat testing guide
 
 ---
 
@@ -409,11 +408,10 @@ music-assistant/
 │   │   └── workers/     # Background workers (legacy)
 │   ├── tests/           # Test suite
 │   └── requirements.txt
-├── docs/                # Comprehensive documentation (NEW)
+├── docs/                # Comprehensive documentation
 │   ├── ARCHITECTURE.md
 │   ├── AGENT.md
-│   ├── TOOLS.md
-│   └── EXECUTION_PLAN.md
+│   └── TOOLS.md
 ├── output/              # Default output directory
 └── README.md           # This file
 ```
@@ -463,7 +461,7 @@ Full API documentation available at `/api/docs` (Swagger UI) when running.
 - **FFmpeg** - Audio format conversion
 
 ### LLM Integration (NEW)
-- **OpenAI API** - GPT-4 for agent reasoning
+- **OpenAI Responses API** - Event-based API for agent reasoning (gpt-5)
 - Future: Anthropic, local models
 
 ### Database

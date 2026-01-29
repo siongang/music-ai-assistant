@@ -28,6 +28,26 @@ Quick guide to which document to read when.
 
 ---
 
+## ⚡ Design Patterns (Essential Reading!)
+
+### **docs/API_CLIENT_PATTERNS.md** ⭐
+**API client best practices.**
+- Signal merging for timeouts
+- Safe response parsing
+- Error handling patterns
+- Common mistakes to avoid
+- **Read this before adding API endpoints**
+
+### **docs/STATE_MANAGEMENT_PATTERNS.md** ⭐
+**State management best practices.**
+- Normalized state architecture
+- Hierarchical data patterns
+- Zustand + Immer usage
+- Performance optimization
+- **Read this before creating stores**
+
+---
+
 ## 🛠️ During Development
 
 ### **docs/CURSOR_PROMPTS.md**
@@ -140,6 +160,8 @@ Script to create folder structure.
 | What prompt do I use for Phase X? | CURSOR_PROMPTS.md or MVP_ROADMAP.md |
 | How does the object tree work? | ARCHITECTURE_DIAGRAM.md |
 | How do I call the API? | API_INTEGRATION.md |
+| How should I structure API calls? | API_CLIENT_PATTERNS.md ⭐ |
+| How should I manage state? | STATE_MANAGEMENT_PATTERNS.md ⭐ |
 | What's the code pattern for X? | QUICK_REFERENCE.md |
 | How do I debug Y? | QUICK_REFERENCE.md → Debugging |
 | What colors should I use? | Whatever you want! (Phase 6) |

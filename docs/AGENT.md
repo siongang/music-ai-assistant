@@ -183,13 +183,29 @@ class ToolRegistry:
 
 **Responsibilities**:
 - Abstract over LLM providers (OpenAI, Anthropic, local models)
-- Handle function calling / tool use API
-- Parse LLM responses
+- Handle event-based Responses API
+- Parse LLM output items (function_call, message)
+- Sanitize input items (ensure JSON strings for function_call_output)
 - Error handling for API failures
 
 **Implementations**:
-- `OpenAIClient`: Uses OpenAI API (gpt-4, gpt-3.5-turbo)
+- `OpenAIClient`: Uses OpenAI Responses API (gpt-5, event-based)
 - Future: `AnthropicClient`, `LocalLLMClient`
+
+**Key Method**:
+```python
+def run(
+    self,
+    input_items: List[Dict[str, Any]],  # Event-based input
+    tools: Optional[List[Dict]] = None,
+    instructions: Optional[str] = None
+) -> LLMResponse:
+    """
+    Send request using Responses API.
+    
+    Returns LLMResponse with output items (function_call, message, etc.)
+    """
+```
 
 ---
 
@@ -200,20 +216,19 @@ class ToolRegistry:
 ```
 1. User sends message → API → AgentExecutor
 2. Load session context (previous messages, tool results)
-3. Build prompt:
-   - System prompt (agent role, capabilities)
-   - Conversation history
-   - Available tools (schemas)
-   - Recent tool results
-4. Call LLM with function calling enabled
-5. Parse LLM response:
-   a. If tool calls → Execute tools → Log results → Loop to step 4
-   b. If text response → Return to user
+3. Build input_items from conversation history (event-based format)
+4. Call LLM with Responses API (event-based):
+   - input_items: conversation messages + previous function_call_output items
+   - tools: available tool schemas
+   - instructions: system prompt
+5. Process LLM output items:
+   a. If function_call items → Execute tools → Add function_call_output → Loop to step 4
+   b. If message items → Extract content → Return to user
    c. If error → Return error message
 6. Return final response to user
 ```
 
-### Detailed Loop (Pseudocode)
+### Detailed Loop (Event-Based with Responses API)
 
 ```python
 def process_message(session_id, user_message):
@@ -223,50 +238,69 @@ def process_message(session_id, user_message):
     step_count = 0
     tool_results = []
     
-    # Agent loop
+    # Build initial input_items from conversation history
+    conversation_messages = get_messages_for_llm(session_id)
+    input_items = [
+        {"role": msg["role"], "content": msg["content"]}
+        for msg in conversation_messages
+    ]
+    
+    # Agent loop (event-based)
     while step_count < MAX_STEPS:
         step_count += 1
         
-        # Build prompt
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            *get_conversation_history(session_id),
-            *format_tool_results(tool_results)
-        ]
-        
-        # Call LLM
-        llm_response = llm_client.chat(
-            messages=messages,
-            tools=tool_registry.get_tool_schemas()
+        # Call Responses API with accumulated input_items
+        llm_response = llm_client.run(
+            input_items=input_items,
+            tools=tool_registry.get_tool_schemas(),
+            instructions=SYSTEM_PROMPT
         )
         
-        # Handle response
-        if llm_response.has_tool_calls():
-            # Execute tools
-            for tool_call in llm_response.tool_calls:
+        # Add all output items to input_items for next iteration
+        input_items.extend(llm_response.output)
+        
+        # Process output events
+        has_tool_calls = False
+        final_content = None
+        
+        for item in llm_response.output:
+            if item["type"] == "function_call":
+                has_tool_calls = True
+                call_id = item["call_id"]
+                tool_name = item["name"]
+                tool_args = item["arguments"]
+                
+                # Execute tool
                 try:
-                    result = tool_registry.execute(
-                        tool_call.name, 
-                        **tool_call.arguments
-                    )
-                    log_tool_call(session_id, tool_call, result)
-                    tool_results.append(result)
+                    result = tool_registry.execute(tool_name, **tool_args)
+                    log_tool_call(session_id, tool_name, tool_args, result)
+                    tool_results.append({"tool": tool_name, "result": result})
+                    
+                    # Add function_call_output to input_items
+                    input_items.append({
+                        "type": "function_call_output",
+                        "call_id": call_id,
+                        "output": json.dumps(result)
+                    })
                 except Exception as e:
-                    log_error(session_id, tool_call, e)
-                    tool_results.append({"error": str(e)})
+                    log_error(session_id, tool_name, e)
+                    input_items.append({
+                        "type": "function_call_output",
+                        "call_id": call_id,
+                        "output": json.dumps({"error": str(e)})
+                    })
             
-            # Continue loop (LLM will see tool results)
+            elif item["type"] == "message":
+                final_content = item.get("content", "")
+        
+        # If we have tool calls, continue the loop
+        if has_tool_calls:
             continue
         
-        elif llm_response.has_text():
-            # Final response to user
-            response_text = llm_response.text
-            log_agent_response(session_id, response_text)
-            return AgentResponse(message=response_text)
-        
-        else:
-            # Unexpected response
-            return AgentResponse(message="Error processing request")
+        # If we have final content, return it
+        if final_content:
+            log_agent_response(session_id, final_content)
+            return AgentResponse(message=final_content)
     
     # Max steps reached
     return AgentResponse(message="Request too complex, please simplify")
@@ -340,9 +374,12 @@ For v3.0+:
 
 ## LLM Integration
 
-### Function Calling
+### Responses API (Event-Based)
 
-The agent uses OpenAI's **function calling** feature (similar for other providers):
+The agent uses OpenAI's **Responses API**, which is an event-based API that supports:
+- **Input items**: Messages, function_call, function_call_output
+- **Output items**: Messages, function_call
+- **Accumulative context**: Input items accumulate across iterations
 
 **Tool Schema Example**:
 ```json
@@ -365,21 +402,36 @@ The agent uses OpenAI's **function calling** feature (similar for other provider
 }
 ```
 
-**LLM Response (Tool Call)**:
+**Input Items Format**:
 ```json
-{
-  "role": "assistant",
-  "tool_calls": [
-    {
-      "id": "call_xyz",
-      "type": "function",
-      "function": {
-        "name": "separate_stems",
-        "arguments": "{\"audio_id\": \"abc-123\"}"
-      }
-    }
-  ]
-}
+[
+  {"role": "user", "content": "Separate my audio"},
+  {"type": "function_call", "call_id": "call_123", "name": "separate_stems", "arguments": "{\"audio_id\": \"abc-123\"}"},
+  {"type": "function_call_output", "call_id": "call_123", "output": "{\"job_id\": \"xyz-789\", \"status\": \"queued\"}"}
+]
+```
+
+**LLM Output Items**:
+```json
+[
+  {
+    "type": "function_call",
+    "call_id": "call_xyz",
+    "name": "separate_stems",
+    "arguments": {"audio_id": "abc-123"}
+  }
+]
+```
+
+Or for final response:
+```json
+[
+  {
+    "type": "message",
+    "role": "assistant",
+    "content": "I've started separating your audio..."
+  }
+]
 ```
 
 ### System Prompt
@@ -407,13 +459,22 @@ Important:
 - Important constraints (no music theory)
 - Behavioral guidelines (be helpful)
 
-### Temperature & Sampling
+### Responses API Details
 
-- **Temperature 0.7**: Balanced creativity and consistency
-- Lower (0.2): More deterministic, less creative
-- Higher (1.0): More creative, less consistent
+**Input Items**:
+- `{"role": "user", "content": "..."}` - User messages
+- `{"role": "assistant", "content": "..."}` - Assistant messages
+- `{"type": "function_call", "call_id": "...", "name": "...", "arguments": "..."}` - Tool calls (arguments as JSON string)
+- `{"type": "function_call_output", "call_id": "...", "output": "..."}` - Tool results (output as JSON string)
 
-For tool selection, 0.7 works well - deterministic enough to call correct tools, creative enough to handle varied phrasing.
+**Output Items**:
+- `{"type": "message", "role": "assistant", "content": "..."}` - Text responses
+- `{"type": "function_call", "call_id": "...", "name": "...", "arguments": {...}}` - Tool calls (arguments as dict)
+
+**Key Features**:
+- Event-based: Each item is a discrete event
+- Accumulative: Input items accumulate across iterations
+- String sanitization: function_call_output and function_call arguments must be JSON strings
 
 ---
 
@@ -634,10 +695,11 @@ logging.basicConfig(level=logging.DEBUG)
 **Debug Steps**:
 1. Check tool schemas: `curl http://localhost:8000/api/tools`
 2. Verify system prompt mentions tools
-3. Check LLM response parsing (log `llm_response`)
-4. Ensure model supports function calling (gpt-4, not gpt-3.5-turbo-instruct)
+3. Check LLM response parsing (log `llm_response.output`)
+4. Ensure model supports Responses API (gpt-5 or compatible model)
+5. Verify input_items are correctly formatted (check logs)
 
-**Fix**: Use gpt-4 or gpt-3.5-turbo (not instruct models)
+**Fix**: Use gpt-5 or compatible model that supports Responses API
 
 #### Tools Failing with Errors
 
@@ -844,4 +906,3 @@ Get conversation history for a session.
 
 ---
 
-**For implementation details, see [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md)**

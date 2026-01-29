@@ -535,21 +535,18 @@ class AgentExecutor:
         
         Returns Action with type: "respond", "tool_call", or "error"
         """
-        # Build prompt with:
-        # - System prompt (agent role, available tools)
-        # - Conversation history
-        # - Tool results
+        # Build input_items from conversation history
+        # Input items accumulate across iterations (event-based)
+        input_items = self._build_input_items(session)
         
-        messages = self._build_prompt(session)
-        
-        # Call LLM (with function calling / tools API)
-        response = self.llm.chat(
-            messages=messages,
+        # Call Responses API (event-based)
+        response = self.llm.run(
+            input_items=input_items,
             tools=self.tools.get_tool_schemas(),
-            temperature=0.7
+            instructions=self.SYSTEM_PROMPT
         )
         
-        # Parse response into Action
+        # Parse output items into Action
         return self._parse_llm_response(response)
 ```
 
@@ -745,47 +742,50 @@ class SessionService:
 
 **File**: `app/agent/llm_client.py`
 
-**Purpose**: Abstract over different LLM providers
+**Purpose**: Abstract over different LLM providers using event-based Responses API
 
 **Interface**:
 
 ```python
 class LLMClient:
-    def chat(
+    def run(
         self, 
-        messages: List[Dict[str, str]], 
+        input_items: List[Dict[str, Any]], 
         tools: Optional[List[Dict]] = None,
-        temperature: float = 0.7
+        instructions: Optional[str] = None
     ) -> LLMResponse:
         """
-        Send chat completion request to LLM.
+        Send request using Responses API (event-based).
         
         Args:
-            messages: Conversation history [{"role": "user", "content": "..."}, ...]
+            input_items: List of input events (messages, function_call, function_call_output)
             tools: Tool definitions for function calling
-            temperature: Sampling temperature
+            instructions: System instructions/prompt
         
         Returns:
-            LLMResponse with either text response or tool call
+            LLMResponse with output items (function_call, message, etc.)
         """
         raise NotImplementedError
 
 class OpenAIClient(LLMClient):
-    def __init__(self, api_key: str, model: str = "gpt-4"):
+    def __init__(self, api_key: str, model: str = "gpt-5"):
         self.client = openai.OpenAI(api_key=api_key)
         self.model = model
     
-    def chat(self, messages, tools=None, temperature=0.7):
-        response = self.client.chat.completions.create(
+    def run(self, input_items, tools=None, instructions=None):
+        # Sanitize input_items (ensure function_call_output and function_call arguments are JSON strings)
+        sanitized_input = self._sanitize_input_items(input_items)
+        
+        response = self.client.responses.create(
             model=self.model,
-            messages=messages,
+            input=sanitized_input,
             tools=tools,
-            temperature=temperature
+            instructions=instructions
         )
         return self._parse_response(response)
 
 class AnthropicClient(LLMClient):
-    # Similar implementation for Claude
+    # Future: Similar implementation for Claude (if they support event-based API)
     pass
 ```
 
@@ -1151,7 +1151,6 @@ TOOL_TIMEOUT=30
 
 ## Implementation Checklist
 
-See [`docs/EXECUTION_PLAN.md`](./EXECUTION_PLAN.md) for detailed step-by-step plan.
 
 **Phase 1: Foundation** (Day 1)
 - [ ] Create agent layer structure

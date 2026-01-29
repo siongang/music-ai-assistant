@@ -1129,5 +1129,4 @@ When symbolic analysis layer is added, these tools become available:
 
 ---
 
-**For implementation guide, see [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md)**  
 **For agent framework details, see [`AGENT.md`](./AGENT.md)**
