@@ -12,12 +12,12 @@ export default function StudioHomeLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="flex h-screen overflow-hidden bg-zinc-950">
+    <div className="flex h-screen overflow-hidden bg-black">
       {/* Left Sidebar */}
-      <aside className="flex w-64 flex-col border-r border-zinc-800/80 bg-zinc-950">
+      <aside className="flex w-64 flex-col border-r border-zinc-900 bg-black">
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-zinc-800/80 px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600">
+        <div className="flex h-16 items-center gap-3 px-6">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600">
             <svg className="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 20 20">
               <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" />
             </svg>
@@ -79,8 +79,8 @@ export default function StudioHomeLayout({
         </nav>
 
         {/* Bottom - Logout */}
-        <div className="border-t border-zinc-800/80 p-4">
-          <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-400 transition-all hover:bg-zinc-800/50 hover:text-red-400">
+        <div className="p-4">
+          <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-400 transition-all hover:bg-zinc-900 hover:text-red-400">
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
@@ -89,10 +89,10 @@ export default function StudioHomeLayout({
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top Bar */}
-        <header className="flex h-16 items-center justify-end gap-4 border-b border-zinc-800/80 bg-zinc-950 px-6">
+      {/* Main Content - full height scrollbar */}
+      <div className="flex-1 overflow-auto bg-black scrollbar-thin scrollbar-track-black scrollbar-thumb-zinc-800 hover:scrollbar-thumb-zinc-700">
+        {/* Top Bar - sticky */}
+        <header className="sticky top-0 z-10 flex h-16 items-center justify-end gap-4 border-b border-zinc-900 bg-black px-6">
           <button className="rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25 transition-all hover:shadow-xl hover:shadow-cyan-500/40">
             Upgrade
           </button>
@@ -102,7 +102,7 @@ export default function StudioHomeLayout({
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-auto">
+        <main className="bg-black">
           {children}
         </main>
       </div>

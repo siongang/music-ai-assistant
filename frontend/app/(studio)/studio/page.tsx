@@ -23,7 +23,7 @@ export default function StudioPage() {
 
         {/* Upload Section */}
         <div className="mb-12">
-          <button className="group relative flex w-full items-center justify-center gap-3 rounded-xl border-2 border-dashed border-zinc-700 bg-zinc-900/50 p-12 transition-all hover:border-cyan-500/50 hover:bg-zinc-900/80">
+          <button className="group relative flex w-full items-center justify-center gap-3 rounded-xl border-2 border-dashed border-zinc-800 bg-zinc-950 p-12 transition-all hover:border-cyan-500/50 hover:bg-zinc-900">
             <div className="flex flex-col items-center gap-4">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 text-cyan-400 transition-all group-hover:scale-110">
                 <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -55,10 +55,10 @@ export default function StudioPage() {
           </div>
 
           {/* Empty State - with demo link */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-12">
+          <div className="rounded-xl border border-zinc-900 bg-zinc-950 p-12">
             <div className="flex flex-col items-center text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-800/50">
-                <svg className="h-8 w-8 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900">
+                <svg className="h-8 w-8 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
               </div>
@@ -74,7 +74,7 @@ export default function StudioPage() {
                 </button>
                 <Link
                   href="/project/demo"
-                  className="rounded-lg border border-zinc-700 bg-zinc-800/50 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:border-zinc-600 hover:bg-zinc-700/50"
+                  className="rounded-lg border border-zinc-800 bg-zinc-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:border-zinc-700 hover:bg-zinc-800"
                 >
                   View Demo
                 </Link>
