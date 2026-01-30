@@ -143,15 +143,12 @@ Each feature (tools, tracks, views) has its own components, hooks, and utils. Sh
 
 ## 🎨 Design System
 
-Inspired by **Moises.ai**:
+See **DESIGN_SYSTEM.md** for the full spec. Summary:
 
-- **Colors:**
-  - Background: `#0A0A0A`
-  - Surface: `#1A1A1A`
-  - Accent: `#00E5FF` (cyan)
-  - Text: `#FFFFFF` / `#A0A0A0`
-- **Typography:** Inter or Geist Sans
-- **Spacing:** 4px grid (Tailwind default)
+- **Background:** Pure black (`bg-black`) for main areas; `bg-zinc-950` for elevated surfaces
+- **Borders:** `border-zinc-900` or `border-zinc-800/50`
+- **Accent:** Tailwind cyan-500/cyan-400; primary CTA: `from-cyan-500 to-blue-600`
+- **Typography:** Geist Sans; spacing per Tailwind scale
 
 ## 🧪 Testing
 
@@ -182,10 +179,10 @@ npm test             # Run tests
 The frontend communicates with a FastAPI backend at `http://localhost:8000`.
 
 **Key endpoints:**
-- `POST /api/audio/upload` - Upload audio files
-- `POST /api/jobs/separate_stems` - Create stem separation job
+- `POST /api/audio` - Upload audio files (multipart)
+- `POST /api/jobs` - Create job (body: `{ type, input, params }`)
 - `GET /api/jobs/{id}` - Get job status
-- `POST /api/chat` - Chat with AI agent
+- `POST /api/chat/sessions`, `POST /api/chat/message` - Chat with AI agent
 
 See `docs/API_INTEGRATION.md` for details.
 
@@ -267,7 +264,7 @@ MIT
 
 ## 🙏 Acknowledgments
 
-- **Design inspiration:** Moises.ai
+- **Design:** See DESIGN_SYSTEM.md (black, zinc, cyan); inspiration: Moises.ai
 - **Architecture:** Influenced by VSCode's extension model
 - **Development approach:** Optimized for Cursor AI assistance
 

@@ -163,16 +163,15 @@ After completing the MVP, you should be able to:
 Make sure these work before starting frontend:
 
 ### Audio
-- ✅ `POST /api/audio/upload` - Upload audio file
-- ✅ `GET /api/audio/{id}` - Get audio metadata
+- ✅ `POST /api/audio` - Upload audio file (multipart form; not `/api/audio/upload`)
 - ✅ `GET /api/audio/{id}/download` - Download audio blob
+- ✅ `GET /api/audio/files/{path}` - Download job outputs (stems, MIDI, etc.)
 
 ### Jobs
-- ✅ `POST /api/jobs/separate_stems` - Create stem separation job
-  - Request: `{ audio_id: string }`
-  - Response: `{ job_id: string }`
+- ✅ `POST /api/jobs` - Create job (body: `{ type: "stem_separation", input: { audio_id: "..." }, params: {} }`)
+  - Response: `{ job_id, status, ... }`
 - ✅ `GET /api/jobs/{id}` - Get job status
-  - Response: `{ id, status, job_type, result, error, ... }`
+  - Response: `{ job_id, status, type, output, progress, ... }`
 
 ### Projects (Optional for MVP)
 - Can use localStorage for now

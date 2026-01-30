@@ -197,7 +197,7 @@ frontend/
 │   └── lib/                                # Utilities, constants, config
 │       ├── utils.ts                        # Generic helpers (cn, etc.)
 │       ├── constants.ts                    # App constants
-│       ├── theme.ts                        # Color palette, design tokens
+│       ├── theme.ts                        # Optional; prefer DESIGN_SYSTEM.md + Tailwind
 │       └── validators.ts                   # Zod schemas (if needed)
 │
 ├── public/                                 # Static assets

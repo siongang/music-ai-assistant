@@ -2,6 +2,8 @@
 
 Quick guide to which document to read when.
 
+> **Full project status (backend + frontend):** See repo root [PROJECT_STATUS.md](../PROJECT_STATUS.md).
+
 ---
 
 ## 🚀 Getting Started (Read in This Order)

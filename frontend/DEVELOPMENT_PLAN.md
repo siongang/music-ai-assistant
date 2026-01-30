@@ -1,5 +1,22 @@
 # AI Music Agent - Frontend Development Plan
 
+## Current Progress (as of Jan 2026)
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| 0 Foundation | ✅ Done | App Router, route groups, TypeScript, Tailwind |
+| 1 Type System | ✅ Done | MusicalObject, Project, Tool, View in `src/types/` |
+| 2 API Client | ✅ Done | `src/api-client/` – audio, jobs, chat |
+| 3 Adapters | ✅ Done | `src/adapters/` – job → object, project, status |
+| 4 Object Tree | ✅ Done | Zustand store + hooks in `src/features/object-tree/` |
+| 5 Layout Shell | 🟡 Partial | Studio sidebar + project DAW shell exist; object panel not wired to store |
+| 6–8 Design / AppBar / Transport | 🟡 Partial | Present in layouts (header, transport footer); no shared design system yet |
+| 9+ Object Panel (tree), Track Area, Waveform, Tools, Playback | 🔲 Not done | Shells/placeholders only |
+
+**Next:** Wire object panel to object-tree store, then upload flow, then track area + waveform, then tool execution and playback. See [PROJECT_STATUS.md](../PROJECT_STATUS.md) for full stack status.
+
+---
+
 ## Project Overview
 
 A Next.js-based music workstation that is **NOT a DAW** but a **project-centric workspace** where:
@@ -229,8 +246,8 @@ The studio layout should have the 3 fixed zones."
 
 **Cursor Prompt Strategy:**
 ```
-"Create a design system inspired by Moises.ai:
-dark theme, cyan accents (#00E5FF), modern buttons,
+"Create a design system matching DESIGN_SYSTEM.md:
+pure black (bg-black) background, zinc borders, cyan accents (Tailwind cyan-500/400), modern buttons,
 cards, inputs. Use Tailwind and create base components."
 ```
 
@@ -239,11 +256,11 @@ cards, inputs. Use Tailwind and create base components."
 - `src/components/ui/card.tsx`
 - `src/components/ui/input.tsx`
 - `src/components/ui/dropdown.tsx`
-- `src/lib/theme.ts` (color constants)
+- Optional `src/lib/theme.ts`; prefer Tailwind classes from DESIGN_SYSTEM.md
 
 **Acceptance Criteria:**
-- Dark theme (#0A0A0A background)
-- Cyan accent (#00E5FF)
+- Pure black background (bg-black); see DESIGN_SYSTEM.md
+- Cyan accent (Tailwind cyan-500/cyan-400)
 - Consistent spacing
 - Accessible (basic ARIA)
 
@@ -680,7 +697,7 @@ Now create the AppBar component with..."
 ### 3. Reference Existing Code
 ```
 "Use the Button component from src/components/ui/button.tsx
-and apply the cyan accent color from src/lib/theme.ts"
+and follow DESIGN_SYSTEM.md for colors (bg-black, cyan accents)"
 ```
 
 ### 4. Request Specific File Locations
@@ -719,7 +736,7 @@ I'm building Phase 7 of the AI Music Agent frontend.
 Context:
 - We have a design system in src/components/ui with Button, Card, Input
 - The studio layout is in app/(studio)/layout.tsx
-- We're using Tailwind with a dark theme (#0A0A0A) and cyan accent (#00E5FF)
+- We're using Tailwind per DESIGN_SYSTEM.md: pure black (bg-black), zinc borders, cyan accents
 
 Task:
 Create the AppBar component for the top navigation bar.
@@ -769,10 +786,7 @@ See `FOLDER_STRUCTURE.md` for the complete directory layout.
 ## Design Reference
 
 - **Primary inspiration:** Moises.ai (dark theme, clean UI, tool-based workflow)
-- **Color scheme:** 
-  - Background: `#0A0A0A`
-  - Surface: `#1A1A1A`
-  - Accent: `#00E5FF` (cyan)
+- **Color scheme:** See **DESIGN_SYSTEM.md** – pure black (`bg-black`), zinc for borders/surfaces, cyan accents (Tailwind cyan-500/400)
   - Text: `#FFFFFF` / `#A0A0A0`
 - **Typography:** Inter or Geist Sans
 - **Spacing:** 4px grid (Tailwind default)
@@ -788,7 +802,7 @@ By the end of all phases, you should have:
 ✅ Multiple view modes (waveform, MIDI, sheet)
 ✅ Tool execution with job tracking
 ✅ Audio playback with multi-track support
-✅ Professional, modern UI inspired by Moises.ai
+✅ Professional, modern UI per DESIGN_SYSTEM.md (black, zinc, cyan)
 ✅ Extensible architecture for new tools/features
 
 ---

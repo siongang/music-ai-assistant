@@ -142,11 +142,12 @@ Show me the refactored code.
 ### Colors
 
 ```typescript
-// Tailwind classes
-bg-zinc-950     // Background (#0A0A0A)
-bg-zinc-900     // Surface (#1A1A1A)
-text-cyan-400   // Accent text (#00E5FF)
-bg-cyan-500     // Accent background
+// Tailwind classes (see DESIGN_SYSTEM.md)
+bg-black        // Main background (#000000)
+bg-zinc-950     // Elevated surfaces (cards, panels)
+border-zinc-900 // Borders
+text-cyan-400   // Accent text
+bg-cyan-500     // Accent / CTA (or gradient from-cyan-500 to-blue-600)
 text-white      // Primary text
 text-zinc-400   // Muted text
 ```
@@ -165,13 +166,13 @@ text-zinc-400   // Muted text
 </Button>
 
 // Card
-<Card className="bg-zinc-900 hover:bg-zinc-800 transition-colors">
+<Card className="bg-zinc-950 hover:bg-zinc-900 transition-colors">
   Content
 </Card>
 
 // Input
 <Input 
-  className="bg-zinc-900 border-zinc-700 focus:border-cyan-400" 
+  className="bg-zinc-950 border-zinc-800 focus:border-cyan-500" 
   placeholder="Type here..."
 />
 ```
@@ -417,14 +418,14 @@ and the studio layout (app/(studio)/layout.tsx). Now create..."
 ### 2. Reference Existing Files
 ```
 "Use the Button component from src/components/ui/button.tsx
-and the theme colors from src/lib/theme.ts"
+and follow DESIGN_SYSTEM.md for colors (bg-black, cyan accents)"
 ```
 
 ### 3. Iterate, Don't Restart
 If Cursor's output isn't perfect:
 ```
-"The component works but the styling is off. Update it to use
-bg-zinc-900 instead of bg-gray-800 and add hover effects."
+"The component works but the styling is off. Update it to match
+DESIGN_SYSTEM.md: bg-black for main background, zinc borders, cyan accents."
 ```
 
 ### 4. Ask for Explanations
@@ -488,7 +489,7 @@ Context:
 Requirements:
 1. Create VolumeMeter component in src/features/tracks/components/
 2. Show vertical bar that fills based on audio level (0-100)
-3. Use cyan color (#00E5FF) for active portion
+3. Use cyan accent (Tailwind cyan-500 or cyan-400) for active portion
 4. Update every frame during playback
 5. Add to TrackHeader component
 

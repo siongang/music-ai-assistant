@@ -2,7 +2,7 @@
  * Project Workstation Layout
  * 
  * Full-screen DAW interface with modular components
-git  * Design: Single header, footer with transport controls
+ * Design: Single header, footer with transport controls
  */
 
 "use client";

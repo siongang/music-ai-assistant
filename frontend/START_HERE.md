@@ -131,8 +131,7 @@ When starting a phase, tell Cursor what already exists:
 "We're building Phase 7: AppBar Component.
 
 Context:
-- Design system exists in src/components/ui
-- Theme colors in src/lib/theme.ts
+- Design system exists in src/components/ui; follow DESIGN_SYSTEM.md (bg-black, zinc borders, cyan accents)
 - Studio layout in app/(studio)/layout.tsx
 
 Now create the AppBar component with..."
@@ -141,7 +140,7 @@ Now create the AppBar component with..."
 ### Rule #3: Reference Existing Code
 ```
 "Use the Button component from src/components/ui/button.tsx
-and apply the cyan accent color from src/lib/theme.ts"
+and follow DESIGN_SYSTEM.md for colors (bg-black, cyan accents)"
 ```
 
 ### Rule #4: Verify After Each Phase
@@ -185,15 +184,14 @@ Fix any issues."
 
 ## 🎨 Design System
 
-**Note:** Choose your own colors in Phase 6. The docs use dark theme + accent color as placeholders, but you can customize them to match your vision.
+**Use DESIGN_SYSTEM.md** for all UI styling. Current standard:
 
-**Default placeholders (change these):**
-- **Background:** Dark (`#0A0A0A` or similar)
-- **Surface:** Slightly lighter dark (`#1A1A1A`)
-- **Accent:** Your choice (docs use cyan as example)
-- **Text:** White / muted gray
+- **Background:** Pure black (`bg-black`, #000000) for main areas
+- **Borders:** `border-zinc-900` or `border-zinc-800/50`
+- **Accent:** Tailwind cyan (`cyan-500`, `cyan-400`); primary CTA gradient: `from-cyan-500 to-blue-600`
+- **Text:** `text-white` / `text-zinc-400` for muted
 
-**All colors will be centralized in `src/lib/theme.ts` for easy customization.**
+Optional `src/lib/theme.ts` for JS color values; otherwise use Tailwind classes from DESIGN_SYSTEM.md.
 
 ---
 

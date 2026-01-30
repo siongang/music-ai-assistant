@@ -15,6 +15,8 @@ This document contains **ready-to-use prompts** for each development phase. Copy
 
 **Important:** Complete phases in order. Each phase builds on previous work.
 
+**Styling:** Use **DESIGN_SYSTEM.md** for all UI: pure black (`bg-black`) main background, `border-zinc-900` or `border-zinc-800/50`, cyan accents (`cyan-500`/`cyan-400`, gradient `from-cyan-500 to-blue-600`). Do not use old refs like `#0A0A0A` or `bg-zinc-950` for main backgrounds.
+
 ---
 
 ## Phase 1: Type System & Domain Models
@@ -280,8 +282,8 @@ Set up the route structure and layouts.
 
 3. app/(studio)/layout.tsx:
    - Fixed layout with 3 zones:
-     - Top: AppBar placeholder (h-14, bg-zinc-950)
-     - Below: TransportBar placeholder (h-12, bg-zinc-900)
+     - Top: AppBar placeholder (h-14, bg-black)
+     - Below: TransportBar placeholder (h-12, bg-black)
      - Main: 2-column layout (resizable later, for now 20% / 80%)
        - Left: Object panel placeholder
        - Right: Track area placeholder
@@ -307,42 +309,36 @@ Test: Navigate between / and /studio to verify layouts.
 ### Prompt 6A: Design Tokens & Base Components
 
 ```
-Phase 6: Create a design system inspired by Moises.ai.
+Phase 6: Create a design system matching our app styling.
 
 Context:
-- Dark theme with cyan accents
+- Follow DESIGN_SYSTEM.md: pure black (bg-black) background, zinc borders, cyan accents
+- Main background: bg-black (#000000). Elevated surfaces: bg-zinc-950. Borders: border-zinc-900 or border-zinc-800/50
+- Accent: Tailwind cyan-500, cyan-400; primary CTA gradient: from-cyan-500 to-blue-600
 - Modern, clean aesthetics
-- Colors: bg #0A0A0A, surface #1A1A1A, accent #00E5FF
 
 Task:
-Create design system primitives.
+Create design system primitives (or use Tailwind directly per DESIGN_SYSTEM.md).
 
-1. src/lib/theme.ts:
-   - Export color constants:
-     - COLORS.background: '#0A0A0A'
-     - COLORS.surface: '#1A1A1A'
-     - COLORS.accent: '#00E5FF'
-     - COLORS.text: '#FFFFFF'
-     - COLORS.textMuted: '#A0A0A0'
-   - Export spacing scale
-   - Export border radius values
+1. Optional src/lib/theme.ts:
+   - Only if you need JS values; otherwise use Tailwind classes from DESIGN_SYSTEM.md
+   - If created: COLORS.background = '#000000', accent = cyan-500 hex, etc.
 
 2. src/components/ui/button.tsx:
    - Button component with variants:
-     - primary (filled, cyan background)
-     - secondary (outlined, cyan border)
-     - ghost (no background)
+     - primary (bg-gradient-to-r from-cyan-500 to-blue-600, text-white)
+     - secondary (outlined, border-cyan-500/30, text-cyan-400)
+     - ghost (no background, text-zinc-400 hover:text-white)
    - Sizes: sm, md, lg
-   - Use Tailwind for styling
-   - TypeScript with proper props
+   - Use Tailwind; match DESIGN_SYSTEM.md
 
 3. src/components/ui/card.tsx:
-   - Card component (bg-zinc-900, rounded, padding)
-   - Optional hover effect
+   - Card: bg-zinc-950 or bg-black with border-zinc-900, rounded, padding
+   - Optional hover effect (hover:bg-zinc-900/50)
 
 4. src/components/ui/input.tsx:
-   - Input component (dark theme)
-   - Focus state with cyan ring
+   - Input: dark theme (bg-zinc-950, border-zinc-800), text-white
+   - Focus: ring-cyan-500/50 or focus:border-cyan-500
 
 5. src/components/ui/dropdown.tsx:
    - Dropdown menu component
@@ -364,9 +360,9 @@ Use Tailwind CSS. Make components composable and accessible.
 Phase 7: Create the AppBar component for the studio.
 
 Context:
-- Design system in src/components/ui
+- Design system in src/components/ui; styling in DESIGN_SYSTEM.md
 - Layout in app/(studio)/layout.tsx
-- Theme colors in src/lib/theme.ts
+- Use bg-black for main backgrounds, border-zinc-900, cyan accents
 
 Task:
 Create the AppBar component with proper UI elements.
@@ -374,18 +370,17 @@ Create the AppBar component with proper UI elements.
 1. src/features/studio-shell/components/AppBar.tsx:
    - Layout:
      - Left: Hamburger menu button (☰)
-     - Center-left: Logo/wordmark "AI Music Agent"
+     - Center-left: Logo/wordmark "Music Assistant"
      - Center: Project name (editable input)
-     - Right: "Get Pro" button (outlined cyan)
-     - Far right: User avatar (placeholder: "SG")
+     - Right: "Upgrade" button (gradient: from-cyan-500 to-blue-600, or outlined cyan)
+     - Far right: User avatar (placeholder)
    - Props:
      - projectName: string
      - onProjectNameChange: (name: string) => void
      - onMenuClick: () => void
-     - onGetProClick: () => void
+     - onUpgradeClick: () => void
    - Styling:
-     - Fixed top bar (h-14)
-     - Dark background (bg-zinc-950)
+     - Fixed top bar (h-16), bg-black, border-b border-zinc-800/50
      - Flex layout with space-between
      - Responsive: hide project name on mobile
 
@@ -414,7 +409,7 @@ Task:
 Create transport bar with playback controls.
 
 1. src/features/transport/components/TransportBar.tsx:
-   - Container component (h-12, bg-zinc-900)
+   - Container component (h-16, bg-black, border-t optional)
    - Layout:
      - Left: Transport controls (Play, Pause, Skip Forward, Loop)
      - Center: Time display (00:00.0)
@@ -621,8 +616,8 @@ Create waveform visualization.
      - duration: number
      - zoom: number
      - scrollX: number
-   - Draw waveform with cyan (#00E5FF) stroke
-   - Dark background (#0A0A0A)
+   - Draw waveform with cyan stroke (Tailwind cyan-500 or cyan-400)
+   - Dark background: bg-black (#000000)
 
 2. src/features/views/waveform/hooks/useWaveformCanvas.ts:
    - Hook to manage canvas drawing
@@ -1123,11 +1118,9 @@ Create landing page in (marketing) route.
    - Copyright notice
 
 Styling:
-- Dark theme (bg-zinc-950)
-- Cyan accents for buttons
+- Pure black background (bg-black), zinc borders; see DESIGN_SYSTEM.md
+- Cyan accents for buttons (from-cyan-500 to-blue-600 or text-cyan-400)
 - Responsive (mobile-first)
-
-Reference: Moises.ai landing page screenshot
 ```
 
 ---
@@ -1222,7 +1215,7 @@ Run tests with: npm test
 ### Tip 1: Referencing Files
 ```
 "Use the Button component from src/components/ui/button.tsx
-and apply the theme colors from src/lib/theme.ts"
+and follow DESIGN_SYSTEM.md for colors (bg-black, cyan accents, zinc borders)."
 ```
 
 ### Tip 2: Iterating on Errors
