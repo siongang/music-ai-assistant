@@ -1,34 +1,21 @@
 # API Endpoints
 
-## Purpose
+Endpoints are organized by resource. **Projects own audio and jobs**; create/list/get for audio and jobs are under `/api/projects/{project_id}/...`.
 
-Individual endpoint modules organized by resource. Each module contains related HTTP endpoints.
+## Routers
 
-## Current Endpoints
+| Module | Prefix / Path | Purpose |
+|--------|----------------|---------|
+| **projects** | `/api/projects` | Project CRUD, GET/PUT `/api/projects/{id}/tree` |
+| **project_audio** | `/api/projects/{project_id}/audio` | Upload, list, get metadata, download (project-scoped) |
+| **project_jobs** | `/api/projects/{project_id}/jobs` | Create job, list jobs, get job (project-scoped) |
+| **audio** | `/api/audio` | `GET /api/audio/files/{path}` only (job outputs by path) |
+| **chat** | `/api/chat` | Sessions, message, history (LLM agent) |
 
-- **`audio.py`**: Audio file upload (`POST /api/audio`)
-- **`jobs.py`**: Job management (`POST /api/jobs`, `GET /api/jobs/{job_id}`)
-- **`chat.py`**: LLM agent endpoints (`POST /api/chat/message`, `POST /api/chat/sessions`)
+## Design
 
-## Structure
+- **Dependency injection**: Services per request (FastAPI).
+- **Errors**: `HTTPException` with appropriate status codes.
+- **Validation**: File extensions/sizes for uploads; project existence and ownership for project-scoped routes.
 
-Each endpoint module:
-- Defines dependency functions for services
-- Creates `APIRouter` instance
-- Uses FastAPI dependency injection
-- Returns Pydantic schema responses
-
-## Important Notes
-
-1. **Dependency Injection**: Services created per request (FastAPI manages lifecycle)
-2. **Error Handling**: Use `HTTPException` with appropriate status codes
-3. **File Validation**: Check extensions and sizes before processing
-4. **Type Hints**: Required for validation and IDE support
-
-## Future Improvements
-
-- [ ] Job operations (cancel, retry, delete)
-- [ ] Job listing with filters and pagination
-- [ ] File download endpoints
-- [ ] WebSocket for real-time updates
-- [ ] Batch operations
+See [BACKEND_PROJECTS_UPDATE.md](../../../BACKEND_PROJECTS_UPDATE.md) for full route list and schema.

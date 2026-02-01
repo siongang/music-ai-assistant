@@ -40,18 +40,20 @@ class JobService:
         job_type: str,
         input_data: Dict[str, Any],
         params: Optional[Dict[str, Any]] = None,
-        status: str = JobStatus.QUEUED
+        status: str = JobStatus.QUEUED,
+        project_id: UUID = ...,
     ) -> Job:
         """
-        Create a new job in the database.
-        
+        Create a new job in the database. Project must exist; project owns the job.
+
         Args:
             job_id: Unique identifier for the job
             job_type: Type of job (e.g., "stem_separation")
             input_data: Input data dictionary (e.g., {"audio_id": "..."})
             params: Optional parameters dictionary (e.g., {"model": "demucs_v4"})
             status: Initial job status (default: "queued")
-            
+            project_id: Project that owns this job (required)
+
         Returns:
             Created Job object
         """
@@ -60,7 +62,8 @@ class JobService:
             type=job_type,
             input=input_data,
             params=params,
-            status=status
+            status=status,
+            project_id=project_id,
         )
         self.db.add(job)
         self.db.commit()
@@ -135,3 +138,19 @@ class JobService:
             List of Job objects with the specified status
         """
         return self.db.query(Job).filter(Job.status == status).all()
+
+    def list_jobs(
+        self,
+        project_id: UUID,
+        status: Optional[str] = None,
+        job_type: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Job]:
+        """List jobs for a project. Newest first. Optional status/type filter."""
+        query = self.db.query(Job).filter(Job.project_id == project_id)
+        if status:
+            query = query.filter(Job.status == status)
+        if job_type:
+            query = query.filter(Job.type == job_type)
+        return query.order_by(Job.created_at.desc()).limit(limit).offset(offset).all()

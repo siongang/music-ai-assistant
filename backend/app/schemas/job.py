@@ -22,17 +22,13 @@ class JobParams(BaseModel):
 
 class JobCreate(BaseModel):
     """
-    Schema for job creation request data.
-    
+    Schema for job creation. project_id comes from the URL (POST /projects/{project_id}/jobs).
+
     Example:
     {
         "type": "stem_separation",
-        "input": {
-            "audio_id": "audio_abc123"
-        },
-        "params": {
-            "model": "demucs_v4"
-        }
+        "input": { "audio_id": "audio_abc123" },
+        "params": { "model": "demucs_v4" }
     }
     """
     type: str
@@ -50,15 +46,12 @@ class JobOutput(BaseModel):
 
 
 class JobResponse(BaseModel):
-    """
-    Schema for job response data.
-    
-    Used when returning job information from API endpoints.
-    """
+    """Schema for job response data."""
     job_id: UUID
     type: str
     status: str
     audio_id: UUID
+    project_id: UUID
     input: Dict[str, Any]
     params: Optional[Dict[str, Any]] = None
     output: Optional[Dict[str, Any]] = None
@@ -68,7 +61,5 @@ class JobResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
     class Config:
-        # Allow creating from SQLAlchemy models
         from_attributes = True
-        # Map 'id' field to 'job_id' in response
         populate_by_name = True

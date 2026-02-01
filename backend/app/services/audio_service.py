@@ -5,7 +5,7 @@ This service handles all database operations related to audio files,
 including creation and retrieval.
 """
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 from pathlib import Path
 import logging
@@ -38,26 +38,29 @@ class AudioService:
         self.storage = storage or LocalStorage(root=Path(STORAGE_ROOT))
 
     def create_audio(
-        self, 
-        audio_id: UUID, 
-        filename: str, 
-        file_path: str
+        self,
+        audio_id: UUID,
+        filename: str,
+        file_path: str,
+        project_id: UUID,
     ) -> Audio:
         """
-        Create a new audio record in the database.
-        
+        Create a new audio record in the database. Project must exist; project owns the audio.
+
         Args:
             audio_id: Unique identifier for the audio
             filename: Original filename
             file_path: Path to the stored file (relative to storage root)
-            
+            project_id: Project that owns this audio (required)
+
         Returns:
             Created Audio object
         """
         audio = Audio(
             id=audio_id,
             filename=filename,
-            file_path=file_path
+            file_path=file_path,
+            project_id=project_id,
         )
         self.db.add(audio)
         self.db.commit()
@@ -97,4 +100,20 @@ class AudioService:
             return None
         
         return self.storage.get_audio_file_path(str(audio_id), audio.filename)
+
+    def list_audio(
+        self,
+        project_id: UUID,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Audio]:
+        """List audio records for a project. Newest first."""
+        return (
+            self.db.query(Audio)
+            .filter(Audio.project_id == project_id)
+            .order_by(Audio.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
 

@@ -57,13 +57,13 @@ class ConvertToMidiTool(Tool):
             logger.error(f"[TOOL] convert_to_midi | Invalid audio_id format | audio_id={audio_id}")
             raise ValueError(f"Invalid audio_id format: {audio_id}")
         
-        # Validate audio exists
-        audio_path = self.audio_service.get_audio_path(audio_uuid)
-        if not audio_path:
+        # Validate audio exists and get project (jobs are project-owned)
+        audio = self.audio_service.get_audio(audio_uuid)
+        if not audio:
             logger.error(f"[TOOL] convert_to_midi | Audio not found | audio_id={audio_id}")
             raise ValueError(f"Audio {audio_id} not found")
-        
-        logger.debug(f"[TOOL] convert_to_midi | Audio validated | audio_id={audio_id} | path={audio_path}")
+        project_id = audio.project_id
+        logger.debug(f"[TOOL] convert_to_midi | Audio validated | audio_id={audio_id} | project_id={project_id}")
         
         # Prepare params
         params = {}
@@ -71,7 +71,7 @@ class ConvertToMidiTool(Tool):
             params["midi_tempo"] = midi_tempo
             logger.debug(f"[TOOL] convert_to_midi | Using custom tempo | midi_tempo={midi_tempo}")
         
-        # Create job
+        # Create job (project owns the job)
         job_id = uuid4()
         logger.info(f"[TOOL] convert_to_midi | Creating job | job_id={job_id} | audio_id={audio_id} | params={params}")
         
@@ -79,7 +79,8 @@ class ConvertToMidiTool(Tool):
             job_id=job_id,
             job_type=JobType.MIDI_CONVERSION,
             input_data={"audio_id": audio_id},
-            params=params
+            params=params,
+            project_id=project_id,
         )
         
         logger.info(f"[TOOL] convert_to_midi | Job created | job_id={job_id} | status={job.status}")

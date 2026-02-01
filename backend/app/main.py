@@ -17,8 +17,8 @@ env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 # Import all models so they're registered with SQLAlchemy
-# This ensures tables are created on startup
-from app.models import Session, AgentStep, Job, Audio  # noqa: F401
+# This ensures tables are created on startup (Project must be before Audio/Job for FK)
+from app.models import Project, Session, AgentStep, Job, Audio  # noqa: F401
 
 # Configure logging
 logging.basicConfig(
@@ -44,6 +44,17 @@ app = FastAPI(
     docs_url="/api/docs",  # Swagger UI at /api/docs
     redoc_url="/api/redoc"  # ReDoc at /api/redoc
 )
+
+
+@app.get("/")
+def root():
+    """Root redirects to API info."""
+    return {
+        "message": "Music Assistant API",
+        "docs": "/api/docs",
+        "health": "/api/health",
+    }
+
 
 # Include API routers
 app.include_router(api_router, prefix="/api")

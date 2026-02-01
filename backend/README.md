@@ -4,13 +4,15 @@ FastAPI backend for music analysis and processing. Part of the Music Assistant p
 
 ## Features
 
-- **Audio Upload**: Upload audio files separately from job creation (upload once, use many times)
-- **Flexible Jobs**: Create different types of jobs (stem separation, MIDI conversion, melody extraction, chord analysis)
-- **Stem Separation**: Automatically separate audio into stems (vocals, drums, bass, other) using Demucs
-- **MIDI Conversion**: Convert audio to MIDI format with note events using Basic Pitch
-- **Job Management**: Track job status, progress, and results
-- **Background Processing**: Asynchronous job processing via Celery and Redis
-- **Extensible Architecture**: Easy to add new job types and processing pipelines
+- **Projects**: Root aggregate; own audio and jobs. CRUD + object tree (GET/PUT tree snapshot).
+- **Project-scoped audio**: Upload/list/get/download under `POST/GET /api/projects/{project_id}/audio`.
+- **Project-scoped jobs**: Create/list/get under `POST/GET /api/projects/{project_id}/jobs`; input audio must belong to the project.
+- **Stem Separation**: Demucs (vocals, drums, bass, other). **MIDI Conversion**: Basic Pitch.
+- **Job outputs**: Download by path via `GET /api/audio/files/{path}`.
+- **Chat/Agent**: Sessions, message, history; tools create jobs with project from audio.
+- **Background Processing**: Celery + Redis. Extensible job types.
+
+**API reference:** See [BACKEND_PROJECTS_UPDATE.md](./BACKEND_PROJECTS_UPDATE.md) for routes and schema.
 
 ## Quick Start
 
