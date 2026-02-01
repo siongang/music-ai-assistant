@@ -1,7 +1,9 @@
 # Music Assistant - Current State Documentation
 
-**Date**: January 6, 2026  
+**Date**: January 29, 2026  
 **Purpose**: Document what's currently working and what needs to be done
+
+> **Quick overview:** See [PROJECT_STATUS.md](./PROJECT_STATUS.md) for a one-page "where we are" and next steps.
 
 ---
 
@@ -11,10 +13,11 @@
 **Status**: ✅ Working
 
 **What it does:**
-- Accepts audio file uploads
-- Creates processing jobs
-- Returns job status
-- Provides file downloads
+- **Projects:** CRUD and object tree (`GET/PUT /api/projects/{id}/tree`). Projects own audio and jobs.
+- **Audio (project-scoped):** Upload `POST /api/projects/{project_id}/audio`, list/get/download under same path.
+- **Jobs (project-scoped):** Create `POST /api/projects/{project_id}/jobs`, list/get under same path; input audio must belong to that project.
+- **Job outputs:** `GET /api/audio/files/{path}` (e.g. stems, MIDI by path).
+- **Chat/Agent:** Create sessions, send messages, get history; LLM tools get project from audio when creating jobs.
 
 **How to run:**
 ```bash
@@ -65,8 +68,9 @@ redis-cli ping
 - **Not ideal for production/home server**
 
 **What it stores:**
-- Audio metadata (filename, upload date, file path)
-- Job records (type, status, progress, results)
+- **Projects** (name, tempo, key, time_signature, tree_snapshot, etc.)
+- **Audio** (project_id required, filename, file_path)
+- **Job** records (project_id required, type, status, progress, results)
 
 ### File Storage
 **Status**: ✅ Working (Local filesystem)
@@ -88,6 +92,24 @@ backend/tmp/
             ├── track.mid
             └── track_notes.csv
 ```
+
+### Frontend (Next.js)
+**Status**: 🟡 Foundation and shells done; core workflow not wired
+
+**What exists:**
+- **Phases 0–4 complete:** TypeScript types (Project, MusicalObject, Tool, View), API client (audio, jobs, chat), adapters (API ↔ app models), Zustand object-tree store with selection.
+- **Studio UI:** `/studio` – sidebar nav (Home, Projects, Docs, Examples, Pricing), welcome, upload CTA, recent projects (empty), "View Demo" link.
+- **Project UI:** `/project/[id]` – DAW-style shell (header with project name/tempo/key, collapsible Objects panel, transport footer). Project page content is a "Waveform Editor – Coming soon" placeholder.
+
+**What’s not done yet:** Object panel not connected to the object-tree store; no upload → backend → tree flow; no track area, waveform renderer, tool execution from UI, or audio playback. See [frontend/MVP_ROADMAP.md](frontend/MVP_ROADMAP.md) and [PROJECT_STATUS.md](PROJECT_STATUS.md).
+
+### LLM Agent (Backend)
+**Status**: ✅ Working
+
+**What it does:**
+- Session-based chat: create session, send messages, get history.
+- Tools: `separate_stems`, `convert_to_midi`, `get_job_status` – agent chooses and calls them.
+- Persists sessions and agent steps in the database.
 
 ---
 

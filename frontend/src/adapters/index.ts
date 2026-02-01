@@ -8,8 +8,10 @@
  */
 
 // Musical Object adapters
+export type { ApiTreeObject } from './musical-object';
 export {
   jobToMusicalObject,
+  apiObjectToMusicalObject,
   musicalObjectToApi,
   audioUploadToObject,
   extractFilePaths,
@@ -30,9 +32,10 @@ export {
 } from './job';
 
 // Project adapters
-export type { ApiProject } from './project';
+export type { ApiProject, ApiProjectListItem } from './project';
 export {
   apiProjectToProject,
+  apiProjectListItemToProjectListItem,
   projectToApiProject,
   createProject,
   validateProjectName,

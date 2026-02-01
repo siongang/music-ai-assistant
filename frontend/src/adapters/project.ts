@@ -4,13 +4,10 @@
  * Converts project-related DTOs between API and app formats.
  */
 
-import type { Project, TimeSignature } from '@/types';
+import type { Project, ProjectListItem, TimeSignature } from '@/types';
 
 /**
- * API Project DTO (as it might come from backend)
- * 
- * Note: The backend doesn't currently have a projects endpoint,
- * so this is a placeholder for future implementation.
+ * API Project DTO (matches backend ProjectResponse)
  */
 export interface ApiProject {
   id: string;
@@ -22,10 +19,21 @@ export interface ApiProject {
     denominator: number;
   };
   root_object_id?: string | null;
-  description?: string;
-  thumbnail?: string;
-  created_at: string; // ISO timestamp
-  updated_at: string; // ISO timestamp
+  description?: string | null;
+  thumbnail?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * API Project list item DTO (matches backend ProjectListItem)
+ */
+export interface ApiProjectListItem {
+  id: string;
+  name: string;
+  thumbnail?: string | null;
+  updated_at: string;
+  created_at: string;
 }
 
 /**
@@ -41,14 +49,29 @@ export function apiProjectToProject(apiProject: ApiProject): Project {
   return {
     id: apiProject.id,
     name: apiProject.name,
-    tempo: apiProject.tempo || 120,
-    key: apiProject.key || 'C',
-    timeSignature: apiProject.time_signature || { numerator: 4, denominator: 4 },
+    tempo: apiProject.tempo ?? 120,
+    key: apiProject.key ?? 'C',
+    timeSignature: apiProject.time_signature ?? { numerator: 4, denominator: 4 },
     rootObject: null, // Loaded separately via object tree
-    description: apiProject.description,
-    thumbnail: apiProject.thumbnail,
+    description: apiProject.description ?? undefined,
+    thumbnail: apiProject.thumbnail ?? undefined,
     createdAt: new Date(apiProject.created_at),
     updatedAt: new Date(apiProject.updated_at),
+  };
+}
+
+/**
+ * Convert API project list item to app ProjectListItem
+ */
+export function apiProjectListItemToProjectListItem(
+  item: ApiProjectListItem
+): ProjectListItem {
+  return {
+    id: item.id,
+    name: item.name,
+    thumbnail: item.thumbnail ?? undefined,
+    updatedAt: new Date(item.updated_at),
+    createdAt: new Date(item.created_at),
   };
 }
 

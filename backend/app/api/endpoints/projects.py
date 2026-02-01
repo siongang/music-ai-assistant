@@ -142,14 +142,17 @@ def get_project_tree(
     project_id: UUID,
     project_service: ProjectService = Depends(get_project_service),
 ):
-    """Get object tree snapshot for a project. Returns { objects, root_id } or null."""
-    tree = project_service.get_tree(project_id)
-    if tree is None:
+    """Get object tree snapshot for a project. Returns { objects, root_id }; empty if none set."""
+    project = project_service.get_project(project_id)
+    if not project:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
-    return tree if tree else {"objects": {}, "root_id": None}
+    tree = project.tree_snapshot
+    if tree and isinstance(tree, dict):
+        return tree
+    return {"objects": {}, "root_id": None}
 
 
 @router.put("/{project_id}/tree")

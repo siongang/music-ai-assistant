@@ -2,6 +2,8 @@
 
 **Welcome!** This guide will help you deploy your Music Assistant to a home server using Docker.
 
+> **Where are we?** For a quick project status (backend, frontend, next steps), see [PROJECT_STATUS.md](./PROJECT_STATUS.md).
+
 ---
 
 ## 📚 Documentation Guide

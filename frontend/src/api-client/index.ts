@@ -27,8 +27,14 @@ export {
 export type {
   AudioUploadResponse,
   AudioMetadata,
+  ProjectAudioMetadata,
   JobCreateRequest,
   JobDTO,
+  ProjectDTO,
+  ProjectListItemDTO,
+  TreeSnapshotDTO,
+  CreateProjectRequest,
+  UpdateProjectRequest,
   ChatMessageRequest,
   ChatMessageResponse,
   SessionCreateResponse,
@@ -36,15 +42,28 @@ export type {
   ApiErrorResponse,
 } from './types';
 
-// Audio endpoints
+// Projects endpoints
 export {
-  uploadAudio,
-  downloadAudio,
+  listProjects,
+  createProject,
+  getProject,
+  updateProject,
+  deleteProject,
+  getProjectTree,
+  putProjectTree,
+} from './endpoints/projects';
+
+// Audio endpoints (project-scoped)
+export {
+  listProjectAudio,
+  uploadProjectAudio,
+  getProjectAudio,
+  downloadProjectAudio,
   downloadFile,
   getAudioMetadata,
 } from './endpoints/audio';
 
-// Job endpoints
+// Job endpoints (project-scoped)
 export {
   createJob,
   getJob,

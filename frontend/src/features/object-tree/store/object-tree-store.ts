@@ -21,6 +21,13 @@ interface ObjectTreeState {
   
   /** Currently selected object IDs */
   selectedIds: string[];
+  
+  /**
+   * True when the tree was mutated since last load or last successful save.
+   * Use to skip redundant PUTs (e.g. on unmount) or to show "Unsaved changes".
+   * Call markClean() after persisting so future save triggers can decide correctly.
+   */
+  isDirty: boolean;
 }
 
 /**
@@ -117,9 +124,15 @@ interface ObjectTreeActions {
   getPath: (id: string) => MusicalObject[];
   
   /**
-   * Clear all objects (reset state)
+   * Clear all objects (reset state). Also resets isDirty (e.g. when loading a project).
    */
   clearAll: () => void;
+
+  /**
+   * Mark tree as clean (no unsaved changes). Call after a successful save so
+   * unmount or other save triggers don't double-save. Optional; clearAll also resets isDirty.
+   */
+  markClean: () => void;
 }
 
 /**
@@ -134,6 +147,7 @@ const initialState: ObjectTreeState = {
   objects: {},
   rootId: null,
   selectedIds: [],
+  isDirty: false,
 };
 
 /**
@@ -162,9 +176,7 @@ export const useObjectTreeStore = create<ObjectTreeStore>()(
         if (!state.rootId && !parentId) {
           state.rootId = object.id;
         }
-        
-        // Note: We don't update parent's children array anymore.
-        // Children are derived on-demand via getChildren() which filters by parentId.
+        state.isDirty = true;
       });
     },
 
@@ -200,6 +212,7 @@ export const useObjectTreeStore = create<ObjectTreeStore>()(
         if (state.rootId === id) {
           state.rootId = null;
         }
+        state.isDirty = true;
       });
     },
 
@@ -212,9 +225,7 @@ export const useObjectTreeStore = create<ObjectTreeStore>()(
         const { children, ...safeUpdates } = updates as Partial<MusicalObject> & { children?: MusicalObject[] };
         Object.assign(object, safeUpdates);
         object.updatedAt = new Date();
-        
-        // Note: If parentId changed, the relationship is automatically updated
-        // because getChildren() derives children from parentId at query time.
+        state.isDirty = true;
       });
     },
 
@@ -301,7 +312,13 @@ export const useObjectTreeStore = create<ObjectTreeStore>()(
     },
 
     clearAll: () => {
-      set(initialState);
+      set({ ...initialState, isDirty: false });
+    },
+
+    markClean: () => {
+      set((state) => {
+        state.isDirty = false;
+      });
     },
   }))
 );

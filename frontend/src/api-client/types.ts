@@ -32,6 +32,7 @@ export enum JobType {
 export interface AudioUploadResponse {
   audio_id: string;
   filename: string;
+  project_id?: string;
 }
 
 /**
@@ -44,6 +45,18 @@ export interface AudioMetadata {
   sample_rate?: number;
   channels?: number;
   format?: string;
+}
+
+/**
+ * Project audio list item (matches backend AudioMetadataResponse)
+ */
+export interface ProjectAudioMetadata {
+  audio_id: string;
+  filename: string;
+  file_path: string;
+  project_id: string;
+  created_at: string;
+  updated_at?: string | null;
 }
 
 /**
@@ -111,6 +124,64 @@ export interface SessionHistoryResponse {
     content: string;
     timestamp: string;
   }>;
+}
+
+/**
+ * Project tree snapshot (matches backend TreeSnapshot)
+ */
+export interface TreeSnapshotDTO {
+  objects: Record<string, Record<string, unknown>>;
+  root_id: string | null;
+}
+
+/**
+ * Project response DTO (matches backend ProjectResponse)
+ */
+export interface ProjectDTO {
+  id: string;
+  name: string;
+  tempo: number;
+  key: string;
+  time_signature: { numerator: number; denominator: number };
+  description?: string | null;
+  thumbnail?: string | null;
+  root_object_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Project list item DTO (matches backend ProjectListItem)
+ */
+export interface ProjectListItemDTO {
+  id: string;
+  name: string;
+  thumbnail?: string | null;
+  updated_at: string;
+  created_at: string;
+}
+
+/**
+ * Create project request (matches backend ProjectCreate)
+ */
+export interface CreateProjectRequest {
+  name: string;
+  tempo?: number;
+  key?: string;
+  time_signature?: { numerator: number; denominator: number };
+  description?: string | null;
+}
+
+/**
+ * Update project request (matches backend ProjectUpdate)
+ */
+export interface UpdateProjectRequest {
+  name?: string;
+  tempo?: number;
+  key?: string;
+  time_signature?: { numerator: number; denominator: number };
+  description?: string | null;
+  thumbnail?: string | null;
 }
 
 /**

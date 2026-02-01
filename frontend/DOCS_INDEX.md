@@ -2,7 +2,8 @@
 
 Quick guide to which document to read when.
 
-> **Full project status (backend + frontend):** See repo root [PROJECT_STATUS.md](../PROJECT_STATUS.md).
+> **Full project status (backend + frontend):** See repo root [PROJECT_STATUS.md](../PROJECT_STATUS.md).  
+> **Backend API (project-owned routes):** See [backend/BACKEND_PROJECTS_UPDATE.md](../backend/BACKEND_PROJECTS_UPDATE.md).
 
 ---
 

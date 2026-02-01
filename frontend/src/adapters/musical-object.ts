@@ -165,6 +165,39 @@ export function musicalObjectToApi(object: MusicalObject): Record<string, unknow
 }
 
 /**
+ * API object shape stored in tree snapshot (matches musicalObjectToApi output)
+ */
+export interface ApiTreeObject {
+  id: string;
+  name: string;
+  type: string;
+  parent_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Convert API tree object to MusicalObject (for loading tree from backend)
+ */
+export function apiObjectToMusicalObject(obj: ApiTreeObject): MusicalObject {
+  const type =
+    typeof obj.type === 'string' && Object.values(ObjectType).includes(obj.type as ObjectType)
+      ? (obj.type as ObjectType)
+      : ObjectType.Audio;
+  return {
+    id: obj.id,
+    name: obj.name,
+    type,
+    parentId: obj.parent_id,
+    children: [],
+    metadata: obj.metadata ?? {},
+    createdAt: new Date(obj.created_at),
+    updatedAt: new Date(obj.updated_at),
+  };
+}
+
+/**
  * Convert audio upload response to AudioObject
  * 
  * @param audioId - Audio ID from upload response

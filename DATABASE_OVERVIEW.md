@@ -8,26 +8,62 @@
 
 ## Overview
 
-Your database has **2 main tables** that store everything your application needs:
+**Projects are the root aggregate.** Audio and jobs belong to a project (required `project_id`). Deleting a project CASCADE-deletes its audio and job rows.
 
-1. **Audio** - Stores information about uploaded audio files
-2. **Job** - Stores information about processing jobs
+1. **Project** – Workspace metadata and optional object tree snapshot (JSON)
+2. **Audio** – Uploaded audio files (owned by a project)
+3. **Job** – Processing jobs (owned by a project)
 
 ---
 
-## Table 1: Audio
+## Table 1: Project
 
 ### Purpose
-Stores metadata about every audio file that gets uploaded.
+Top-level workspace: name, tempo, key, time_signature, and optional object tree snapshot. Projects own all audio and jobs.
 
-### Schema
+### Schema (conceptually)
+
+```sql
+CREATE TABLE projects (
+    id              UUID    PRIMARY KEY,
+    name            VARCHAR(255) NOT NULL,
+    tempo           REAL    NOT NULL DEFAULT 120,
+    key             VARCHAR(16) NOT NULL DEFAULT 'C',
+    time_signature  JSONB   NOT NULL,
+    description     TEXT,
+    thumbnail       VARCHAR(512),
+    tree_snapshot   JSONB,   -- { "objects": {...}, "root_id": "..." }
+    created_at      TIMESTAMP,
+    updated_at      TIMESTAMP
+);
+```
+
+### Key columns
+
+| Column | Purpose |
+|--------|---------|
+| `id` | Unique project ID |
+| `name` | Project name |
+| `tempo`, `key`, `time_signature` | Project settings |
+| `tree_snapshot` | Object tree as JSON (objects map + root_id) |
+
+---
+
+## Table 2: Audio
+
+### Purpose
+Stores metadata about every audio file. **Each row has a required `project_id`**; projects own audio.
+
+### Schema (conceptually)
 
 ```sql
 CREATE TABLE audio (
-    id           UUID          PRIMARY KEY,
-    filename     VARCHAR(255)  NOT NULL,
-    file_path    VARCHAR(512)  NOT NULL,
-    created_at   TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
+    id           UUID    PRIMARY KEY,
+    project_id   UUID    NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    filename     VARCHAR(255) NOT NULL,
+    file_path    VARCHAR(512) NOT NULL,
+    created_at   TIMESTAMP,
+    updated_at   TIMESTAMP
 );
 ```
 
@@ -36,71 +72,41 @@ CREATE TABLE audio (
 | Column | Type | Purpose | Example |
 |--------|------|---------|---------|
 | `id` | UUID | Unique identifier for the audio | `a1b2c3d4-e5f6-...` |
+| `project_id` | UUID | **Required.** Project that owns this audio | project UUID |
 | `filename` | VARCHAR(255) | Original filename uploaded by user | `"mysong.mp3"` |
 | `file_path` | VARCHAR(512) | Relative path where file is stored | `"audio/a1b2c3d4.../mysong.mp3"` |
 | `created_at` | TIMESTAMP | When the audio was uploaded | `2026-01-06 10:30:00` |
 
-### Real Example
-
-```json
-{
-  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "filename": "beethoven_sonata.mp3",
-  "file_path": "audio/a1b2c3d4-e5f6-7890-abcd-ef1234567890/beethoven_sonata.mp3",
-  "created_at": "2026-01-06T10:30:00Z"
-}
-```
-
 ### Workflow
 
 ```
-1. User uploads "mysong.mp3"
-2. System generates UUID: a1b2c3d4...
-3. File saved to: backend/tmp/audio/a1b2c3d4.../mysong.mp3
-4. Record created in database:
-   - id = a1b2c3d4...
-   - filename = "mysong.mp3"
-   - file_path = "audio/a1b2c3d4.../mysong.mp3"
-   - created_at = now()
-```
-
-### How It's Used
-
-```python
-# When user uploads
-audio_service.create_audio(
-    audio_id=uuid4(),
-    filename="mysong.mp3",
-    file_path="audio/a1b2c3d4.../mysong.mp3"
-)
-
-# When creating a job (need to verify audio exists)
-audio_path = audio_service.get_audio_path(audio_id)
-if not audio_path:
-    raise "Audio not found"
+1. User creates/selects a project (project_id).
+2. User uploads "mysong.mp3" via POST /api/projects/{project_id}/audio.
+3. Record created with project_id, id, filename, file_path.
 ```
 
 ---
 
-## Table 2: Job
+## Table 3: Job
 
 ### Purpose
-Stores information about every processing job (stem separation, MIDI conversion, etc.)
+Stores information about every processing job (stem separation, MIDI conversion, etc.). **Each row has a required `project_id`**; projects own jobs.
 
-### Schema
+### Schema (conceptually)
 
 ```sql
-CREATE TABLE job (
-    id              UUID          PRIMARY KEY,
-    type            VARCHAR(50)   NOT NULL,
-    status          VARCHAR(20)   NOT NULL,
-    input           JSONB         NOT NULL,
-    params          JSONB         NULL,
-    output          JSONB         NULL,
-    progress        FLOAT         NULL,
-    error_message   TEXT          NULL,
-    created_at      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE jobs (
+    id              UUID    PRIMARY KEY,
+    project_id      UUID    NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    type            VARCHAR(50) NOT NULL,
+    status          VARCHAR(20) NOT NULL,
+    input           JSONB   NOT NULL,
+    params          JSONB   NULL,
+    output          JSONB   NULL,
+    progress        FLOAT   NULL,
+    error_message   TEXT    NULL,
+    created_at      TIMESTAMP,
+    updated_at      TIMESTAMP
 );
 ```
 
@@ -109,6 +115,7 @@ CREATE TABLE job (
 | Column | Type | Purpose | Example |
 |--------|------|---------|---------|
 | `id` | UUID | Unique identifier for the job | `xyz-789-...` |
+| `project_id` | UUID | **Required.** Project that owns this job | project UUID |
 | `type` | VARCHAR(50) | Type of processing job | `"stem_separation"` |
 | `status` | VARCHAR(20) | Current job status | `"succeeded"` |
 | `input` | JSONB | Input data (what to process) | `{"audio_id": "a1b2..."}` |

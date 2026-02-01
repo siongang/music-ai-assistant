@@ -8,23 +8,25 @@
  */
 
 import {
-  // Audio endpoints
-  uploadAudio,
-  downloadAudio,
+  // Projects
+  listProjects,
+  createProject,
+  getProjectTree,
+  putProjectTree,
+  // Audio (project-scoped)
+  uploadProjectAudio,
+  downloadProjectAudio,
   downloadFile,
-  
-  // Job endpoints
+  // Jobs (project-scoped)
   createJob,
   getJob,
   listJobs,
   pollJobUntilComplete,
   separateStemsAndWait,
-  
-  // Chat endpoints
+  // Chat
   createSession,
   sendMessage,
   getSessionHistory,
-  
   // Types
   JobType,
   JobStatus,
@@ -107,16 +109,18 @@ console.log(`   - Available job types: ${jobTypes.join(', ')}`);
 // ===== Test 5: API Client Usage Examples =====
 console.log('\n✅ Test 5: API client usage patterns');
 
-console.log('\n   📝 Example 1: Upload audio');
+console.log('\n   📝 Example 1: List projects and upload audio');
 console.log('   ```typescript');
+console.log('   const projects = await listProjects({ limit: 50 });');
+console.log('   const projectId = projects[0].id;');
 console.log('   const file = new File([audioData], "song.wav");');
-console.log('   const response = await uploadAudio(file);');
+console.log('   const response = await uploadProjectAudio(projectId, file);');
 console.log('   console.log(response.audio_id);');
 console.log('   ```');
 
-console.log('\n   📝 Example 2: Create stem separation job');
+console.log('\n   📝 Example 2: Create stem separation job (project-scoped)');
 console.log('   ```typescript');
-console.log('   const job = await createJob({');
+console.log('   const job = await createJob(projectId, {');
 console.log('     type: JobType.StemSeparation,');
 console.log('     input: { audio_id: "your-audio-id" },');
 console.log('     params: { model: "demucs" }');
@@ -125,7 +129,7 @@ console.log('   ```');
 
 console.log('\n   📝 Example 3: Poll job until complete');
 console.log('   ```typescript');
-console.log('   const completedJob = await pollJobUntilComplete(job.job_id, {');
+console.log('   const completedJob = await pollJobUntilComplete(projectId, job.job_id, {');
 console.log('     onProgress: (job) => {');
 console.log('       console.log(`Progress: ${job.progress * 100}%`);');
 console.log('     }');
@@ -149,9 +153,9 @@ console.log('   );');
 console.log('   console.log(response.message);');
 console.log('   ```');
 
-console.log('\n   📝 Example 6: List jobs with filters');
+console.log('\n   📝 Example 6: List jobs with filters (project-scoped)');
 console.log('   ```typescript');
-console.log('   const jobs = await listJobs({');
+console.log('   const jobs = await listJobs(projectId, {');
 console.log('     status: JobStatus.Succeeded,');
 console.log('     jobType: JobType.StemSeparation,');
 console.log('     limit: 10');
@@ -160,7 +164,7 @@ console.log('   ```');
 
 console.log('\n   📝 Example 7: High-level helper (separate and wait)');
 console.log('   ```typescript');
-console.log('   const result = await separateStemsAndWait(audioId, (job) => {');
+console.log('   const result = await separateStemsAndWait(projectId, audioId, (job) => {');
 console.log('     setProgress(job.progress);');
 console.log('   });');
 console.log('   // Result contains output with stem file paths');
@@ -171,7 +175,8 @@ console.log('\n🎉 All API client type tests passed!');
 console.log('\n📋 Phase 2 Summary:');
 console.log('   ✅ Base HTTP client with timeout and error handling');
 console.log('   ✅ Typed request/response DTOs matching backend');
-console.log('   ✅ Audio endpoints (upload, download)');
+console.log('   ✅ Projects endpoints (list, create, get, tree)');
+console.log('   ✅ Audio endpoints (project-scoped: upload, list, download)');
 console.log('   ✅ Job endpoints (create, get, list, poll)');
 console.log('   ✅ Chat endpoints (session, message, history)');
 console.log('   ✅ Helper functions (separateStemsAndWait)');

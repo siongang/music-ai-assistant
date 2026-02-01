@@ -357,6 +357,7 @@ curl http://localhost:8000/api/chat/sessions/770e8400-e29b-41d4-a716-44665544022
 ## Documentation
 
 ### For Users
+- **[PROJECT_STATUS.md](./PROJECT_STATUS.md)** - **Where we are** – one-page backend/frontend status and next steps
 - **[START_HERE.md](./START_HERE.md)** - Home server deployment guide (if deploying locally)
 - **[CURRENT_STATE.md](./CURRENT_STATE.md)** - What's currently working and how to run it
 - **[DATABASE_OVERVIEW.md](./DATABASE_OVERVIEW.md)** - Understanding the database schema
