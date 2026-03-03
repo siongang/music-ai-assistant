@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import type { MusicalObject } from '@/types';
+import { isAudioObject } from '@/types';
 
 export interface TreeNodeProps {
   object: MusicalObject;
@@ -41,16 +42,46 @@ export function TreeNode({
     }
   };
 
+  // Make audio objects draggable
+  const isDraggable = isAudioObject(object);
+  
+  const handleDragStart = (e: React.DragEvent) => {
+    if (!isDraggable) return;
+    
+    // Set drag data with audio information
+    e.dataTransfer.setData('application/json', JSON.stringify({
+      id: object.id,
+      name: object.name,
+      type: object.type,
+      metadata: object.metadata,
+    }));
+    e.dataTransfer.effectAllowed = 'copy';
+    
+    // Visual feedback
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+  
+  const handleDragEnd = (e: React.DragEvent) => {
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+  };
+
   return (
     <div>
       <button
         type="button"
         onClick={() => onSelect(object.id)}
+        draggable={isDraggable}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
         className={`group flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs transition-colors ${
           isSelected
             ? 'bg-cyan-500/20 text-cyan-400'
             : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
-        }`}
+        } ${isDraggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
         {hasChildren && (

@@ -47,6 +47,16 @@ export function DropZone({
       
       if (disabled) return;
       
+      // Only activate drop zone for actual file uploads from file system
+      // Internal drags (audio objects) will have 'application/json' type
+      // File uploads will have 'Files' type
+      const hasFiles = e.dataTransfer.types.includes('Files');
+      
+      if (!hasFiles) {
+        // This is an internal drag (audio object), not a file upload
+        return;
+      }
+      
       setDragCounter((prev) => prev + 1);
       
       if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
@@ -78,6 +88,14 @@ export function DropZone({
     (e: DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       e.stopPropagation();
+      
+      // Only respond to file uploads, not internal drags
+      const hasFiles = e.dataTransfer.types.includes('Files');
+      if (hasFiles) {
+        e.dataTransfer.dropEffect = 'copy';
+      } else {
+        e.dataTransfer.dropEffect = 'none';
+      }
     },
     []
   );
@@ -91,6 +109,12 @@ export function DropZone({
       
       setIsDragging(false);
       setDragCounter(0);
+      
+      // Only handle actual file drops, not internal drags
+      const hasFiles = e.dataTransfer.types.includes('Files');
+      if (!hasFiles) {
+        return;
+      }
       
       const files = Array.from(e.dataTransfer.files).filter(isAudioFile);
       
