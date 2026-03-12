@@ -6,7 +6,6 @@
 
 'use client';
 
-import { TRACK_HEADER_WIDTH } from './constants';
 
 export interface TimelineRulerProps {
   /** Total duration in seconds */
@@ -33,7 +32,6 @@ export function TimelineRuler({
   // Calculate marker interval based on zoom
   // Want markers roughly every 80-150 pixels
   const targetPixels = 100;
-  const baseInterval = targetPixels / pixelsPerSecond;
   
   // Round to nice values: 1, 2, 5, 10, 15, 30, 60, 120, etc.
   const niceIntervals = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
@@ -65,24 +63,15 @@ export function TimelineRuler({
   
   return (
     <div 
-      className="sticky top-0 z-20 flex select-none border-b border-zinc-800/30 bg-zinc-950"
+      className="sticky top-0 z-20 select-none border-b border-zinc-800/30 bg-zinc-950"
       style={{ height: `${height}px` }}
     >
-      {/* Header placeholder */}
+      {/* Timeline markers — fills the full width of the right scroll panel */}
       <div 
-        className="border-r border-zinc-800/30 bg-zinc-950 flex-shrink-0"
-        style={{ 
-          width: `${TRACK_HEADER_WIDTH}px`,
-          minWidth: `${TRACK_HEADER_WIDTH}px`,
-        }}
-      />
-      
-      {/* Timeline markers */}
-      <div 
-        className="relative flex-1 bg-black cursor-pointer"
+        className="relative h-full bg-black cursor-pointer"
         onClick={handleClick}
       >
-        <div className="relative h-full" style={{ width: `${timelineWidth}px` }}>
+        <div className="relative h-full" style={{ width: `${Math.max(timelineWidth, 1000)}px` }}>
           {markers.map((time) => {
             const x = time * pixelsPerSecond;
             return (
