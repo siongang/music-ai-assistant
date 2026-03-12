@@ -138,7 +138,7 @@ export class AudioEngine {
    * Preload an audio asset
    * @param assetId - Asset ID to load
    */
-  async preloadAsset(assetId: string): Promise<void> {
+  async preloadAsset(assetId: string): Promise<number> {
     if (!this.ctx) {
       throw new Error('Audio engine not initialized');
     }
@@ -150,12 +150,12 @@ export class AudioEngine {
     
     // Check if already loaded
     if (this.buffers.has(assetId)) {
-      return;
+      return this.buffers.get(assetId)!.duration;
     }
     
     // Check if already loading
     if (this.assetStatuses.get(assetId) === AssetStatus.Loading) {
-      return;
+      return this.assets.get(assetId)?.duration ?? 0;
     }
     
     this.assetStatuses.set(assetId, AssetStatus.Loading);
@@ -186,6 +186,7 @@ export class AudioEngine {
       } as AssetLoadedEventPayload);
       
       console.log(`Loaded asset ${assetId}: ${audioBuffer.duration}s`);
+      return audioBuffer.duration;
     } catch (error) {
       this.assetStatuses.set(assetId, AssetStatus.Error);
       this.emitError(`Failed to load asset ${assetId}`, error as Error);
@@ -220,12 +221,20 @@ export class AudioEngine {
       this.stop();
     }
     
+    // Remove graph nodes for tracks that are no longer in the session
+    const incomingTrackIds = new Set(session.tracks.map((t) => t.id));
+    this.session.tracks.forEach((track) => {
+      if (!incomingTrackIds.has(track.id)) {
+        this.graph!.removeTrack(track.id);
+      }
+    });
+
     this.session = session;
     
-    // Create track nodes
+    // Create (or recreate) track nodes and apply initial mix values
     session.tracks.forEach((track) => {
       this.graph!.createTrack(track.id);
-      this.graph!.setTrackGain(track.id, track.gain);
+      this.graph!.setTrackGain(track.id, track.mute ? 0 : track.gain);
       this.graph!.setTrackPan(track.id, track.pan);
     });
     
@@ -376,7 +385,6 @@ export class AudioEngine {
       this.play();
     }
     
-    console.log(`Seeked to ${this.currentTime}s`);
   }
   
   /**
@@ -441,43 +449,44 @@ export class AudioEngine {
   }
   
   /**
-   * Set track mute
-   * @param trackId - Track ID
-   * @param muted - Mute state
+   * Set track mute — applies immediately to the gain graph without interrupting playback.
    */
   setTrackMute(trackId: string, muted: boolean): void {
-    const track = this.session.tracks.find((t) => t.id === trackId);
-    if (track) {
-      track.mute = muted;
-      
-      // If playing, restart to apply mute
-      if (this._isPlaying) {
-        const currentTime = this.getCurrentTime();
-        this.pause();
-        this.seek(currentTime);
-        this.play();
-      }
+    if (!this.graph) {
+      throw new Error('Audio engine not initialized');
     }
+    const track = this.session.tracks.find((t) => t.id === trackId);
+    if (!track) return;
+
+    track.mute = muted;
+    this._applyMixState();
   }
   
   /**
-   * Set track solo
-   * @param trackId - Track ID
-   * @param solo - Solo state
+   * Set track solo — applies immediately to the gain graph without interrupting playback.
+   * When any track is soloed, all non-soloed tracks are silenced.
    */
   setTrackSolo(trackId: string, solo: boolean): void {
-    const track = this.session.tracks.find((t) => t.id === trackId);
-    if (track) {
-      track.solo = solo;
-      
-      // If playing, restart to apply solo
-      if (this._isPlaying) {
-        const currentTime = this.getCurrentTime();
-        this.pause();
-        this.seek(currentTime);
-        this.play();
-      }
+    if (!this.graph) {
+      throw new Error('Audio engine not initialized');
     }
+    const track = this.session.tracks.find((t) => t.id === trackId);
+    if (!track) return;
+
+    track.solo = solo;
+    this._applyMixState();
+  }
+
+  /**
+   * Recompute effective gain for every track based on mute/solo state and push
+   * to the audio graph. Called after any mute/solo change.
+   */
+  private _applyMixState(): void {
+    const hasSolo = this.session.tracks.some((t) => t.solo);
+    this.session.tracks.forEach((track) => {
+      const silenced = track.mute || (hasSolo && !track.solo);
+      this.graph!.setTrackGain(track.id, silenced ? 0 : track.gain);
+    });
   }
   
   /**

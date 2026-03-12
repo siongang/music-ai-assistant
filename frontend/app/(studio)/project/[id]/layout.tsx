@@ -9,7 +9,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { getProject, getProjectTree, putProjectTree } from "@/api-client";
+import { getProject, getProjectTree, putProjectTree, updateProject } from "@/api-client";
 import { apiProjectToProject } from "@/adapters/project";
 import {
   apiObjectToMusicalObject,
@@ -17,8 +17,25 @@ import {
   type ApiTreeObject,
 } from "@/adapters/musical-object";
 import { useObjectTreeStore } from "@/features/object-tree/store/object-tree-store";
+import { ObjectTreePanel } from "@/features/object-tree/components/ObjectTreePanel";
 import { useAudioUpload, openFilePicker, DropZone, UploadToast } from "@/features/audio-upload";
+import { TransportBar } from "@/features/transport/components/TransportBar";
 import type { Project } from "@/types";
+
+function toApiObj(o: Record<string, unknown>): ApiTreeObject {
+  return {
+    id: String(o.id ?? ""),
+    name: String(o.name ?? ""),
+    type: String(o.type ?? "audio"),
+    parent_id: o.parent_id != null ? String(o.parent_id) : null,
+    metadata:
+      o.metadata && typeof o.metadata === "object" && !Array.isArray(o.metadata)
+        ? (o.metadata as Record<string, unknown>)
+        : {},
+    created_at: String(o.created_at ?? new Date().toISOString()),
+    updated_at: String(o.updated_at ?? new Date().toISOString()),
+  };
+}
 
 export default function ProjectLayout({
   children,
@@ -29,24 +46,29 @@ export default function ProjectLayout({
   const [loading, setLoading] = useState(!!projectId);
   const [error, setError] = useState<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
-  const [isHoveringTitle, setIsHoveringTitle] = useState(false);
   const [currentUploadFilename, setCurrentUploadFilename] = useState<string | null>(null);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
   const hasHydrated = useRef(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const skipTitleBlurCommitRef = useRef(false);
   
   // Audio upload hook
   const { uploadFile, uploadState } = useAudioUpload(projectId || '');
 
   const {
     objects,
-    rootId,
     clearAll,
     addObject,
-    getObject,
     getChildren,
     getRootObjects,
     selectObject,
     clearSelection,
   } = useObjectTreeStore();
+
+  const selectedIds = useObjectTreeStore((s) => s.selectedIds);
 
   // Load project and tree when projectId changes
   useEffect(() => {
@@ -61,23 +83,14 @@ export default function ProjectLayout({
     Promise.all([getProject(projectId), getProjectTree(projectId)])
       .then(([projectDto, tree]) => {
         if (cancelled) return;
-        setProject(apiProjectToProject(projectDto));
+        const nextProject = apiProjectToProject(projectDto);
+        setProject(nextProject);
+        setTitleDraft(nextProject.name);
 
         // Hydrate object-tree store: add all objects with their parent_id
         clearAll();
         hasHydrated.current = true;
         const objs = tree.objects || {};
-        const toApiObj = (o: Record<string, unknown>): ApiTreeObject => ({
-          id: String(o.id ?? ""),
-          name: String(o.name ?? ""),
-          type: String(o.type ?? "audio"),
-          parent_id: o.parent_id != null ? String(o.parent_id) : null,
-          metadata: (o.metadata && typeof o.metadata === "object" && !Array.isArray(o.metadata)
-            ? (o.metadata as Record<string, unknown>)
-            : {}),
-          created_at: String(o.created_at ?? new Date().toISOString()),
-          updated_at: String(o.updated_at ?? new Date().toISOString()),
-        });
         
         // Add all objects - each has its own parent_id (null for roots)
         for (const id of Object.keys(objs)) {
@@ -101,42 +114,28 @@ export default function ProjectLayout({
     };
   }, [projectId, clearAll, addObject]);
   
-  // Handle "Add Object" button click
+  // Shared upload handler — each file becomes a root object (parentId = null)
+  const uploadFiles = async (files: File[]) => {
+    if (!projectId) return;
+    for (const file of files) {
+      try {
+        setCurrentUploadFilename(file.name);
+        await uploadFile(file, null);
+      } catch (error) {
+        console.error("Upload failed:", error);
+        // Error surface is already captured in uploadState
+      } finally {
+        setCurrentUploadFilename(null);
+      }
+    }
+  };
+
   const handleAddObject = async () => {
-    if (!projectId) return;
-    
     const files = await openFilePicker({ multiple: true });
-    
-    for (const file of files) {
-      try {
-        setCurrentUploadFilename(file.name);
-        // Each upload is a root object; only tool outputs are children
-        await uploadFile(file, null);
-      } catch (error) {
-        console.error('Upload failed:', error);
-        // Error is already in uploadState
-      } finally {
-        setCurrentUploadFilename(null);
-      }
-    }
+    await uploadFiles(files);
   };
-  
-  // Handle files dropped on object panel
-  const handleFilesDropped = async (files: File[]) => {
-    if (!projectId) return;
-    
-    for (const file of files) {
-      try {
-        setCurrentUploadFilename(file.name);
-        // Each upload is a root object; only tool outputs are children
-        await uploadFile(file, null);
-      } catch (error) {
-        console.error('Upload failed:', error);
-      } finally {
-        setCurrentUploadFilename(null);
-      }
-    }
-  };
+
+  const handleFilesDropped = (files: File[]) => { void uploadFiles(files); };
 
   // Save tree on unmount only if mutated (avoids redundant PUT; future Save button can use isDirty + markClean)
   useEffect(() => {
@@ -155,6 +154,51 @@ export default function ProjectLayout({
         .catch(() => {});
     };
   }, [projectId]);
+
+  const displayName = project?.name ?? "Project";
+  const tempo = project?.tempo ?? 120;
+  const timeSig = project?.timeSignature ?? { numerator: 4, denominator: 4 };
+  const keySig = project?.key ?? "C";
+
+  useEffect(() => {
+    if (isEditingTitle) {
+      titleInputRef.current?.focus();
+      titleInputRef.current?.select();
+    }
+  }, [isEditingTitle]);
+
+  const commitTitleChange = async () => {
+    if (!projectId || !project) return;
+
+    const nextName = titleDraft.trim();
+    if (!nextName) {
+      setTitleDraft(project.name);
+      setTitleError(null);
+      setIsEditingTitle(false);
+      return;
+    }
+
+    if (nextName === project.name) {
+      setTitleError(null);
+      setIsEditingTitle(false);
+      return;
+    }
+
+    setIsSavingTitle(true);
+    setTitleError(null);
+
+    try {
+      const updated = await updateProject(projectId, { name: nextName });
+      const nextProject = apiProjectToProject(updated);
+      setProject(nextProject);
+      setTitleDraft(nextProject.name);
+      setIsEditingTitle(false);
+    } catch (titleUpdateError) {
+      setTitleError(titleUpdateError instanceof Error ? titleUpdateError.message : "Failed to save title");
+    } finally {
+      setIsSavingTitle(false);
+    }
+  };
 
   if (!projectId) {
     return (
@@ -182,11 +226,6 @@ export default function ProjectLayout({
       </div>
     );
   }
-
-  const displayName = project?.name ?? "Project";
-  const tempo = project?.tempo ?? 120;
-  const timeSig = project?.timeSignature ?? { numerator: 4, denominator: 4 };
-  const keySig = project?.key ?? "C";
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-black">
@@ -217,29 +256,72 @@ export default function ProjectLayout({
         </div>
 
         <div className="absolute left-1/2 -translate-x-1/2">
-          <div
-            className="flex items-center gap-3 rounded-lg px-4 py-1.5 transition-all"
-            onMouseEnter={() => setIsHoveringTitle(true)}
-            onMouseLeave={() => setIsHoveringTitle(false)}
-            style={{
-              outline: isHoveringTitle ? "1px solid rgba(63, 63, 70, 0.5)" : "none",
-            }}
-          >
+          <div className="flex items-center gap-3 rounded-lg border border-transparent px-4 py-1.5">
             <div className="h-4 w-4" aria-hidden="true" />
-            <span className="max-w-md truncate text-sm font-medium text-white">
-              {displayName}
-            </span>
-            <button
-              type="button"
-              className="h-4 w-4 flex-shrink-0 text-zinc-500 transition-colors hover:text-zinc-300"
-              style={{ opacity: isHoveringTitle ? 1 : 0 }}
-              aria-label="Edit project name"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-            </button>
+            {isEditingTitle ? (
+              <div className="flex items-center gap-2">
+                <input
+                  ref={titleInputRef}
+                  value={titleDraft}
+                  onChange={(event) => setTitleDraft(event.target.value)}
+                  onBlur={() => {
+                    if (skipTitleBlurCommitRef.current) {
+                      skipTitleBlurCommitRef.current = false;
+                      return;
+                    }
+                    void commitTitleChange();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void commitTitleChange();
+                    }
+                    if (event.key === "Escape") {
+                      skipTitleBlurCommitRef.current = true;
+                      setTitleDraft(displayName);
+                      setTitleError(null);
+                      setIsEditingTitle(false);
+                    }
+                  }}
+                  disabled={isSavingTitle}
+                  className="w-72 rounded bg-zinc-950 px-2 py-1 text-sm font-medium text-white outline-none ring-1 ring-zinc-800 focus:ring-cyan-500/40"
+                  aria-label="Project name"
+                />
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTitleDraft(displayName);
+                    setTitleError(null);
+                    setIsEditingTitle(true);
+                  }}
+                  className="max-w-md truncate text-left text-sm font-medium text-white transition-colors hover:text-zinc-100"
+                  aria-label="Edit project name"
+                >
+                  {displayName}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTitleDraft(displayName);
+                    setTitleError(null);
+                    setIsEditingTitle(true);
+                  }}
+                  className="h-4 w-4 flex-shrink-0 text-zinc-500 transition-colors hover:text-zinc-300"
+                  aria-label="Edit project name"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+              </>
+            )}
           </div>
+          {titleError && (
+            <p className="mt-1 text-center text-xs text-red-400">{titleError}</p>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -337,7 +419,7 @@ export default function ProjectLayout({
                   getRootObjects={getRootObjects}
                   selectObject={selectObject}
                   clearSelection={clearSelection}
-                  isSelected={(id) => useObjectTreeStore.getState().selectedIds.includes(id)}
+                  isSelected={(id) => selectedIds.includes(id)}
                   onAddObjectClick={handleAddObject}
                   isUploading={uploadState.isUploading}
                 />
@@ -374,179 +456,9 @@ export default function ProjectLayout({
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-black">{children}</main>
       </div>
 
-      <footer className="flex h-16 shrink-0 items-center justify-center bg-black px-6">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-white"
-              aria-label="Play"
-            >
-              <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-white"
-              aria-label="Stop"
-            >
-              <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 6h12v12H6z" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-white"
-              aria-label="Loop"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
-          </div>
-          <div className="font-mono text-lg font-medium text-white">00:00.0</div>
-        </div>
-      </footer>
+      <TransportBar />
       
       <UploadToast uploadState={uploadState} filename={currentUploadFilename || undefined} />
     </div>
   );
 }
-function ObjectTreePanel({
-  objects,
-  getChildren,
-  getRootObjects,
-  selectObject,
-  clearSelection,
-  isSelected,
-  onAddObjectClick,
-  isUploading,
-}: {
-  objects: Record<string, import("@/types").MusicalObject>;
-  getChildren: (parentId: string) => import("@/types").MusicalObject[];
-  getRootObjects: () => import("@/types").MusicalObject[];
-  selectObject: (id: string, multi?: boolean) => void;
-  clearSelection: () => void;
-  isSelected: (id: string) => boolean;
-  onAddObjectClick: () => void;
-  isUploading: boolean;
-}) {
-  // Get all root objects (objects with parentId === null)
-  const rootObjects = getRootObjects();
-
-  if (rootObjects.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <svg
-          className="mb-2 h-8 w-8 text-zinc-800"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-          />
-        </svg>
-        <p className="text-[10px] text-zinc-600">No objects yet</p>
-        <button
-          type="button"
-          onClick={onAddObjectClick}
-          disabled={isUploading}
-          className="mt-1 text-[10px] text-cyan-500 hover:text-cyan-400 disabled:opacity-50"
-        >
-          {isUploading ? 'Uploading...' : 'Drop files here or click to add'}
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-0.5">
-      {rootObjects.map((obj) => (
-        <TreeNode
-          key={obj.id}
-          object={obj}
-          getChildren={getChildren}
-          selectObject={selectObject}
-          isSelected={isSelected}
-          level={0}
-        />
-      ))}
-    </div>
-  );
-}
-
-function TreeNode({
-  object,
-  getChildren,
-  selectObject,
-  isSelected,
-  level,
-}: {
-  object: import("@/types").MusicalObject;
-  getChildren: (parentId: string) => import("@/types").MusicalObject[];
-  selectObject: (id: string, multi?: boolean) => void;
-  isSelected: (id: string) => boolean;
-  level: number;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const children = getChildren(object.id);
-  const hasChildren = children.length > 0;
-
-  return (
-    <div className="select-none">
-      <div
-        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition-colors hover:bg-zinc-900"
-        style={{ paddingLeft: `${level * 8 + 4}px` }}
-      >
-        <button
-          type="button"
-          className="flex h-4 w-4 items-center justify-center text-zinc-500 hover:text-zinc-400"
-          onClick={() => hasChildren && setExpanded((e) => !e)}
-          aria-label={expanded ? "Collapse" : "Expand"}
-        >
-          {hasChildren ? (
-            <svg
-              className={`h-3.5 w-3.5 transition-transform ${expanded ? "" : "-rotate-90"}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          ) : (
-            <span className="w-3.5" />
-          )}
-        </button>
-        <button
-          type="button"
-          className="min-w-0 flex-1 truncate text-left"
-          onClick={() => selectObject(object.id)}
-        >
-          <span className={isSelected(object.id) ? "text-cyan-400" : "text-zinc-300"}>
-            {object.name}
-          </span>
-        </button>
-      </div>
-      {hasChildren && expanded && (
-        <div className="mt-0.5">
-          {children.map((child) => (
-            <TreeNode
-              key={child.id}
-              object={child}
-              getChildren={getChildren}
-              selectObject={selectObject}
-              isSelected={isSelected}
-              level={level + 1}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-

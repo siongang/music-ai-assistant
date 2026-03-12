@@ -14,6 +14,10 @@ class AudioResponse(BaseModel):
     audio_id: UUID
     filename: str
     project_id: UUID
+    duration: Optional[float] = None
+    sample_rate: Optional[int] = None
+    channels: Optional[int] = None
+    format: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -25,9 +29,12 @@ class AudioMetadataResponse(BaseModel):
     filename: str
     file_path: str
     project_id: UUID
+    duration: Optional[float] = None
+    sample_rate: Optional[int] = None
+    channels: Optional[int] = None
+    format: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
-

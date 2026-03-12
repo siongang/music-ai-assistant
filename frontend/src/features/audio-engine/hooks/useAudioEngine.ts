@@ -7,7 +7,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { AudioEngine, EngineEvent, TransportState } from '@/audio_engine';
+import { AudioEngine, EngineEvent, type TransportState } from '@/features/audio-engine/core';
 
 export interface UseAudioEngineResult {
   /** Audio engine instance */

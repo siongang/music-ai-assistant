@@ -7,7 +7,7 @@
 "use client";
 
 import { create } from 'zustand';
-import { Session, Track, Clip } from '@/audio_engine';
+import type { Session, Track, Clip } from '@/features/audio-engine/core';
 
 export interface SessionStore {
   /** Current session */

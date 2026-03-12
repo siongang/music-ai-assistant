@@ -69,7 +69,7 @@ AudioBufferSourceNode
 ## Usage
 
 ```typescript
-import { AudioEngine, EngineEvent } from '@/audio_engine';
+import { AudioEngine, EngineEvent } from '@/features/audio-engine';
 
 // Create engine
 const engine = new AudioEngine();
@@ -191,7 +191,7 @@ audio_engine/
 ## Testing
 
 ```typescript
-import { AudioEngine } from '@/audio_engine';
+import { AudioEngine } from '@/features/audio-engine';
 
 describe('AudioEngine', () => {
   it('should initialize', async () => {

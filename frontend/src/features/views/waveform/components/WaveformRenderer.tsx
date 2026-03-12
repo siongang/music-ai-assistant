@@ -10,8 +10,6 @@
 import { useEffect, useRef } from 'react';
 
 export interface WaveformRendererProps {
-  /** Project ID */
-  projectId: string;
   /** Audio ID */
   audioId: string;
   /** Waveform peak data */
@@ -42,7 +40,6 @@ export interface WaveformRendererProps {
  * - Responsive to zoom level
  */
 export function WaveformRenderer({
-  projectId,
   audioId,
   peaks,
   loading = false,

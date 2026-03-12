@@ -6,15 +6,13 @@
 
 "use client";
 
-import { Track as TrackData } from '@/audio_engine';
+import type { Track as TrackData } from '@/features/audio-engine/core';
 import { DEFAULT_TRACK_HEIGHT } from './constants';
 import { Track } from './Track';
 
 export interface TrackListProps {
   /** All tracks */
   tracks: TrackData[];
-  /** Project ID */
-  projectId: string;
   /** Current playback time */
   currentTime: number;
   /** Pixels per second (zoom level) */
@@ -25,25 +23,18 @@ export interface TrackListProps {
   loadingStates: Map<string, boolean>;
   /** Track height */
   trackHeight?: number;
-  /** On track update */
-  onTrackUpdate?: (trackId: string, updates: Partial<TrackData>) => void;
-  /** On track delete */
-  onTrackDelete?: (trackId: string) => void;
 }
 
 /**
- * List of tracks (scrollable)
+ * Waveform-only track list — headers are rendered in the left panel
  */
 export function TrackList({
   tracks,
-  projectId,
   currentTime,
   pixelsPerSecond,
   waveformData,
   loadingStates,
   trackHeight = DEFAULT_TRACK_HEIGHT,
-  onTrackUpdate,
-  onTrackDelete,
 }: TrackListProps) {
   return (
     <div className="flex flex-col">
@@ -51,14 +42,11 @@ export function TrackList({
         <Track
           key={track.id}
           track={track}
-          projectId={projectId}
           currentTime={currentTime}
           pixelsPerSecond={pixelsPerSecond}
           waveformData={waveformData}
           loadingStates={loadingStates}
           height={trackHeight}
-          onUpdate={(updates) => onTrackUpdate?.(track.id, updates)}
-          onDelete={() => onTrackDelete?.(track.id)}
         />
       ))}
       

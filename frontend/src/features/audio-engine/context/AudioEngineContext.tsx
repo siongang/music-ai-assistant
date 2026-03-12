@@ -7,8 +7,8 @@
 
 'use client';
 
-import { createContext, useContext, useCallback, useState, useEffect } from 'react';
-import { AudioEngine } from '@/audio_engine';
+import { createContext, useCallback, useContext, useEffect, useSyncExternalStore } from 'react';
+import { AudioEngine } from '@/features/audio-engine/core';
 
 export interface AudioEngineContextValue {
   /** Audio engine instance */
@@ -34,6 +34,38 @@ export interface AudioEngineContextValue {
 }
 
 const AudioEngineContext = createContext<AudioEngineContextValue | null>(null);
+
+const defaultAudioEngineContextValue: AudioEngineContextValue = {
+  engine: null,
+  isInitialized: false,
+  isPlaying: false,
+  currentTime: 0,
+  formattedTime: '00:00.0',
+  play: () => {},
+  pause: () => {},
+  stop: () => {},
+  seek: () => {},
+  togglePlayPause: () => {},
+};
+
+let audioEngineSnapshot: AudioEngineContextValue = defaultAudioEngineContextValue;
+const audioEngineListeners = new Set<() => void>();
+
+function updateAudioEngineSnapshot(value: AudioEngineContextValue) {
+  audioEngineSnapshot = value;
+  audioEngineListeners.forEach((listener) => listener());
+}
+
+function subscribeToAudioEngine(listener: () => void) {
+  audioEngineListeners.add(listener);
+  return () => {
+    audioEngineListeners.delete(listener);
+  };
+}
+
+function getAudioEngineSnapshot() {
+  return audioEngineSnapshot;
+}
 
 export interface AudioEngineProviderProps {
   engine: AudioEngine | null;
@@ -69,26 +101,38 @@ export function AudioEngineProvider({
     }
   }, [isPlaying, onPlay, onPause]);
 
-  // Format time as MM:SS.S
-  const formattedTime = useCallback((time: number) => {
+  // Format time as MM:SS.S — pure function, no reactive deps needed
+  function formatTime(time: number): string {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     const deciseconds = Math.floor((time % 1) * 10);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${deciseconds}`;
-  }, []);
+  }
 
   const value: AudioEngineContextValue = {
     engine,
     isInitialized,
     isPlaying,
     currentTime,
-    formattedTime: formattedTime(currentTime),
+    formattedTime: formatTime(currentTime),
     play: onPlay,
     pause: onPause,
     stop: onStop,
     seek: onSeek,
     togglePlayPause,
   };
+
+  // Sync the module-level snapshot so components outside the provider tree
+  // (e.g. TransportBar in the layout) can subscribe via useSyncExternalStore.
+  // Deps are individual primitives so the effect only fires when something
+  // actually changes, not on every render because `value` is a new object.
+  useEffect(() => {
+    updateAudioEngineSnapshot(value);
+    return () => {
+      updateAudioEngineSnapshot(defaultAudioEngineContextValue);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, isInitialized, isPlaying, currentTime, onPlay, onPause, onStop, onSeek, togglePlayPause]);
 
   return (
     <AudioEngineContext.Provider value={value}>
@@ -104,20 +148,11 @@ export function AudioEngineProvider({
  */
 export function useAudioEngine(): AudioEngineContextValue {
   const context = useContext(AudioEngineContext);
-  if (!context) {
-    // Return default values if not in context (graceful degradation)
-    return {
-      engine: null,
-      isInitialized: false,
-      isPlaying: false,
-      currentTime: 0,
-      formattedTime: '00:00.0',
-      play: () => {},
-      pause: () => {},
-      stop: () => {},
-      seek: () => {},
-      togglePlayPause: () => {},
-    };
-  }
-  return context;
+  const snapshot = useSyncExternalStore(
+    subscribeToAudioEngine,
+    getAudioEngineSnapshot,
+    getAudioEngineSnapshot
+  );
+
+  return context ?? snapshot;
 }

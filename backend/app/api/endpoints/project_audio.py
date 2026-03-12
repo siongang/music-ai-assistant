@@ -67,6 +67,10 @@ def list_project_audio(
             filename=a.filename,
             file_path=a.file_path,
             project_id=a.project_id,
+            duration=a.duration,
+            sample_rate=a.sample_rate,
+            channels=a.channels,
+            format=a.original_format,
             created_at=a.created_at,
             updated_at=a.updated_at,
         )
@@ -151,7 +155,17 @@ def upload_project_audio(
             sample_rate=sample_rate,
             channels=channels,
         )
-        return AudioResponse(audio_id=audio.id, filename=audio.filename, project_id=audio.project_id)
+        return AudioResponse(
+            audio_id=audio.id,
+            filename=audio.filename,
+            project_id=audio.project_id,
+            duration=audio.duration,
+            sample_rate=audio.sample_rate,
+            channels=audio.channels,
+            format=audio.original_format,
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to save file for audio {audio_id}: {e}", exc_info=True)
         raise HTTPException(
@@ -180,6 +194,10 @@ def get_project_audio(
         filename=audio.filename,
         file_path=audio.file_path,
         project_id=audio.project_id,
+        duration=audio.duration,
+        sample_rate=audio.sample_rate,
+        channels=audio.channels,
+        format=audio.original_format,
         created_at=audio.created_at,
         updated_at=audio.updated_at,
     )
@@ -212,8 +230,19 @@ def download_project_audio(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail="Audio file not found on disk",
         )
+    _MIME_TYPES: dict[str, str] = {
+        ".wav": "audio/wav",
+        ".mp3": "audio/mpeg",
+        ".flac": "audio/flac",
+        ".ogg": "audio/ogg",
+        ".aac": "audio/aac",
+        ".m4a": "audio/mp4",
+        ".aiff": "audio/aiff",
+        ".wma": "audio/x-ms-wma",
+    }
+    media_type = _MIME_TYPES.get(full_path.suffix.lower(), "application/octet-stream")
     return FileResponse(
         path=str(full_path),
         filename=full_path.name,
-        media_type="audio/mpeg",
+        media_type=media_type,
     )

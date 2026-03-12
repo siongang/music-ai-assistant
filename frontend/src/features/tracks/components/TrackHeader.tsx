@@ -10,7 +10,9 @@
 
 "use client";
 
-import { TRACK_HEADER_WIDTH } from './constants';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { TRACK_HEADER_WIDTH, DEFAULT_TRACK_HEIGHT, TRACK_HEADER_ROW_HEIGHT } from './constants';
 import { HorizontalSlider } from './controls/HorizontalSlider';
 import { PanKnob } from './controls/PanKnob';
 
@@ -37,6 +39,11 @@ export interface TrackHeaderProps {
   onDelete?: () => void;
 }
 
+function formatGain(g: number): string {
+  if (g === 0 || g < 0.001) return '-∞ dB';
+  return `${(20 * Math.log10(g)).toFixed(1)} dB`;
+}
+
 /**
  * Track header with Moises-style layout
  */
@@ -52,11 +59,35 @@ export function TrackHeader({
   onPanChange,
   onDelete,
 }: TrackHeaderProps) {
-  // Format gain for display (as dB)
-  const formatGain = (g: number): string => {
-    if (g === 0 || g < 0.001) return '-∞ dB';
-    return `${(20 * Math.log10(g)).toFixed(1)} dB`;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+
+  const handleMenuToggle = () => {
+    if (!menuOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      // Position menu so it starts at the button's top-left, extending to the right
+      setMenuPos({ top: rect.top, left: rect.left });
+    }
+    setMenuOpen((open) => !open);
   };
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node) && !buttonRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [menuOpen]);
   
   return (
     <div 
@@ -68,8 +99,8 @@ export function TrackHeader({
         maxWidth: `${TRACK_HEADER_WIDTH}px`,
         display: 'grid',
         gridTemplateColumns: '1fr 40px',
-        gridTemplateRows: '32px 32px',
-        height: '64px', // Compact: 2 rows × 32px
+        gridTemplateRows: `${TRACK_HEADER_ROW_HEIGHT}px ${TRACK_HEADER_ROW_HEIGHT}px`,
+        height: `${DEFAULT_TRACK_HEIGHT}px`,
       }}
     >
       {/* COLUMN 1, ROW 1 — Header (explicit placement so pan stays right) */}
@@ -115,15 +146,43 @@ export function TrackHeader({
         
         {/* Options button */}
         {onDelete && (
-          <button
-            type="button"
-            onClick={onDelete}
-            className="flex h-5 w-5 items-center justify-center rounded text-zinc-700 opacity-0 transition-opacity hover:bg-zinc-800/50 hover:text-zinc-500 group-hover:opacity-100 shrink-0"
-            aria-label="Options"
-            title="Track options"
-          >
-            ⋮
-          </button>
+          <div className="shrink-0">
+            <button
+              ref={buttonRef}
+              type="button"
+              onClick={handleMenuToggle}
+              className="flex h-5 w-5 items-center justify-center rounded text-zinc-700 opacity-0 transition-opacity hover:bg-zinc-800/50 hover:text-zinc-500 group-hover:opacity-100"
+              aria-label="Options"
+              title="Track options"
+            >
+              ⋮
+            </button>
+
+            {menuOpen && menuPos && createPortal(
+              <div
+                ref={menuRef}
+                className="min-w-36 rounded-md border border-zinc-800 bg-zinc-950 p-1 shadow-2xl"
+                style={{
+                  position: 'fixed',
+                  top: menuPos.top,
+                  left: menuPos.left,
+                  zIndex: 9999,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onDelete();
+                  }}
+                  className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-red-400 transition-colors hover:bg-zinc-900"
+                >
+                  Delete track
+                </button>
+              </div>,
+              document.body
+            )}
+          </div>
         )}
       </div>
       
