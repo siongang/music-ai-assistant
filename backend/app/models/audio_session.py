@@ -23,7 +23,7 @@ class AudioSession(Base):
         project_id: Project that owns this session (required)
         name: Session name
         tracks: JSON array of track configurations
-        master_gain: Master output gain (0.0 to 1.0)
+        master_gain: Master output gain (0.0 to 2.0)
         created_at: Timestamp when session was created
         updated_at: Timestamp when session was last updated
     """
