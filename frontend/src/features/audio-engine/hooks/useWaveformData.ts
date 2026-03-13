@@ -41,20 +41,28 @@ export function useWaveformData(
   audioId: string,
   level: number = 512
 ): UseWaveformDataResult {
-  const [data, setData] = useState<WaveformData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const requestKey = projectId && audioId ? `${projectId}:${audioId}:${level}` : null;
+  const [result, setResult] = useState<{
+    key: string | null;
+    data: WaveformData | null;
+    error: string | null;
+  }>({
+    key: null,
+    data: null,
+    error: null,
+  });
   
   useEffect(() => {
-    if (!projectId || !audioId) {
+    if (!requestKey) {
       return;
     }
-    
-    setLoading(true);
-    setError(null);
-    
+
+    const controller = new AbortController();
+
     // Fetch waveform data
-    fetch(`/api/projects/${projectId}/audio/${audioId}/waveform?level=${level}`)
+    fetch(`/api/projects/${projectId}/audio/${audioId}/waveform?level=${level}`, {
+      signal: controller.signal,
+    })
       .then((res) => {
         if (!res.ok) {
           throw new Error(`Failed to fetch waveform: ${res.statusText}`);
@@ -62,15 +70,38 @@ export function useWaveformData(
         return res.json();
       })
       .then((waveformData: WaveformData) => {
-        setData(waveformData);
-        setLoading(false);
+        setResult({
+          key: requestKey,
+          data: waveformData,
+          error: null,
+        });
       })
       .catch((err) => {
+        if (controller.signal.aborted) {
+          return;
+        }
         console.error('Failed to fetch waveform data:', err);
-        setError(err.message);
-        setLoading(false);
+        setResult({
+          key: requestKey,
+          data: null,
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
-  }, [projectId, audioId, level]);
+
+    return () => {
+      controller.abort();
+    };
+  }, [projectId, audioId, level, requestKey]);
+
+  if (!requestKey) {
+    return { data: null, loading: false, error: null };
+  }
+
+  const isCurrentResult = result.key === requestKey;
   
-  return { data, loading, error };
+  return {
+    data: isCurrentResult ? result.data : null,
+    loading: !isCurrentResult,
+    error: isCurrentResult ? result.error : null,
+  };
 }

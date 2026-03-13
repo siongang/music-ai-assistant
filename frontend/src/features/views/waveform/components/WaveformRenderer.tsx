@@ -40,15 +40,10 @@ export interface WaveformRendererProps {
  * - Responsive to zoom level
  */
 export function WaveformRenderer({
-  audioId,
   peaks,
   loading = false,
   width,
   height,
-  currentTime,
-  startTime = 0,
-  duration,
-  pixelsPerSecond = 50,
 }: WaveformRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -121,7 +116,7 @@ export function WaveformRenderer({
     ctx.lineTo(width, centerY);
     ctx.stroke();
     ctx.globalAlpha = 1.0;
-  }, [peaks, loading, width, height, currentTime, startTime, duration, pixelsPerSecond]);
+  }, [peaks, loading, width, height]);
   
   return (
     <canvas
