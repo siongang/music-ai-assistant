@@ -48,49 +48,42 @@ export function useAudioUpload(projectId: string): UseAudioUploadReturn {
 
   const uploadFile = useCallback(
     async (file: File, parentId: string | null = null) => {
-      // Validate file type
-      const validTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-wav'];
-      if (!validTypes.includes(file.type) && !file.name.match(/\.(mp3|wav)$/i)) {
+      // Matches backend AUDIO_EXTENSIONS constant — keep in sync if backend changes
+      const validExtensions = /\.(mp3|wav|flac|m4a|ogg|wma|aac|aiff)$/i;
+      const validMimeTypes = [
+        'audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/flac',
+        'audio/ogg', 'audio/aac', 'audio/mp4', 'audio/x-m4a',
+        'audio/aiff', 'audio/x-aiff', 'audio/x-ms-wma',
+      ];
+      const typeValid = validMimeTypes.includes(file.type) || validExtensions.test(file.name);
+      if (!typeValid) {
         setUploadState({
           isUploading: false,
           progress: 0,
-          error: 'Invalid file type. Please upload MP3 or WAV files.',
+          error: 'Unsupported file type. Supported: MP3, WAV, FLAC, M4A, OGG, AAC, AIFF, WMA.',
         });
         return;
       }
 
-      // Start upload
-      setUploadState({
-        isUploading: true,
-        progress: 0,
-        error: null,
-      });
+      setUploadState({ isUploading: true, progress: 0, error: null });
 
       try {
-        // Upload to API
         const response = await uploadProjectAudio(projectId, file);
         
-        // Update progress
-        setUploadState((prev) => ({ ...prev, progress: 0.8 }));
+        const audioObject = audioUploadToObject(response.audio_id, response.filename, {
+          duration: response.duration,
+          sampleRate: response.sample_rate,
+          channels: response.channels,
+          format: response.format,
+        });
         
-        // Convert to MusicalObject
-        const audioObject = audioUploadToObject(response.audio_id, response.filename);
-        
-        // Add to object tree
         addObject(audioObject, parentId);
         
-        // Complete
-        setUploadState({
-          isUploading: false,
-          progress: 1,
-          error: null,
-        });
+        setUploadState({ isUploading: false, progress: 1, error: null });
       } catch (error) {
-        setUploadState({
-          isUploading: false,
-          progress: 0,
-          error: error instanceof Error ? error.message : 'Upload failed',
-        });
+        const message = error instanceof Error ? error.message : 'Upload failed';
+        setUploadState({ isUploading: false, progress: 0, error: message });
+        // Re-throw so callers (e.g. layout.tsx) can log or react
         throw error;
       }
     },

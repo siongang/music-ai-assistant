@@ -33,6 +33,10 @@ export interface AudioUploadResponse {
   audio_id: string;
   filename: string;
   project_id?: string;
+  duration?: number;
+  sample_rate?: number;
+  channels?: number;
+  format?: string;
 }
 
 /**
@@ -55,6 +59,10 @@ export interface ProjectAudioMetadata {
   filename: string;
   file_path: string;
   project_id: string;
+  duration?: number;
+  sample_rate?: number;
+  channels?: number;
+  format?: string;
   created_at: string;
   updated_at?: string | null;
 }
@@ -124,6 +132,38 @@ export interface SessionHistoryResponse {
     content: string;
     timestamp: string;
   }>;
+}
+
+/**
+ * Audio session types (matches backend audio session schemas)
+ */
+export interface AudioSessionListItem {
+  id: string;
+}
+
+export interface AudioSessionClipResponse {
+  id: string;
+  assetId: string;
+  start: number;
+  in: number;
+  duration: number;
+  playbackRate?: number;
+}
+
+export interface AudioSessionTrackResponse {
+  id: string;
+  name: string;
+  gain: number;
+  pan: number;
+  mute: boolean;
+  solo: boolean;
+  clips: AudioSessionClipResponse[];
+}
+
+export interface AudioSessionResponse {
+  id: string;
+  tracks: AudioSessionTrackResponse[];
+  master_gain: number;
 }
 
 /**

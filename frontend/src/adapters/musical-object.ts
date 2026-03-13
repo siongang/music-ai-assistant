@@ -212,7 +212,13 @@ export function apiObjectToMusicalObject(obj: ApiTreeObject): MusicalObject {
  */
 export function audioUploadToObject(
   audioId: string,
-  filename: string
+  filename: string,
+  metadata?: {
+    duration?: number;
+    sampleRate?: number;
+    channels?: number;
+    format?: string;
+  }
 ): AudioObject {
   const now = new Date();
   
@@ -224,6 +230,10 @@ export function audioUploadToObject(
     children: [],
     metadata: {
       filePath: `audio/${audioId}/${filename}`,
+      duration: metadata?.duration,
+      sampleRate: metadata?.sampleRate,
+      channels: metadata?.channels,
+      format: metadata?.format,
     },
     createdAt: now,
     updatedAt: now,

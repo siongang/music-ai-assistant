@@ -43,6 +43,11 @@ class AudioService:
         filename: str,
         file_path: str,
         project_id: UUID,
+        converted_file_path: Optional[str] = None,
+        original_format: Optional[str] = None,
+        duration: Optional[float] = None,
+        sample_rate: Optional[int] = None,
+        channels: Optional[int] = None,
     ) -> Audio:
         """
         Create a new audio record in the database. Project must exist; project owns the audio.
@@ -52,6 +57,11 @@ class AudioService:
             filename: Original filename
             file_path: Path to the stored file (relative to storage root)
             project_id: Project that owns this audio (required)
+            converted_file_path: Path to converted WAV file (optional)
+            original_format: Original file extension (optional)
+            duration: Duration in seconds (optional)
+            sample_rate: Sample rate in Hz (optional)
+            channels: Number of audio channels (optional)
 
         Returns:
             Created Audio object
@@ -61,6 +71,11 @@ class AudioService:
             filename=filename,
             file_path=file_path,
             project_id=project_id,
+            converted_file_path=converted_file_path,
+            original_format=original_format,
+            duration=duration,
+            sample_rate=sample_rate,
+            channels=channels,
         )
         self.db.add(audio)
         self.db.commit()
