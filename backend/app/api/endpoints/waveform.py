@@ -64,14 +64,15 @@ def get_audio_waveform(
             detail=f"Audio {audio_id} not found in project"
         )
     
-    # Get the converted WAV file path (or original if no conversion)
+    # Waveform generation expects a normalized WAV path.
     converted_path = getattr(audio, 'converted_file_path', None)
-    
-    if converted_path:
-        audio_path = Path(STORAGE_ROOT) / converted_path
-    else:
-        # Fallback to original file
-        audio_path = Path(STORAGE_ROOT) / audio.file_path
+    if not converted_path:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="Waveform unavailable because the converted WAV file is missing",
+        )
+
+    audio_path = Path(STORAGE_ROOT) / converted_path
     
     if not audio_path.exists():
         raise HTTPException(

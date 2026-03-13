@@ -141,7 +141,15 @@ def upload_project_audio(
             channels = metadata.get("channels")
             logger.info(f"Audio conversion successful: {audio_id}")
         except Exception as conv_error:
-            logger.warning(f"Audio conversion failed: {conv_error}. Continuing without conversion.")
+            logger.error(f"Audio conversion failed for {audio_id}: {conv_error}", exc_info=True)
+            try:
+                file_path.unlink()
+            except OSError:
+                logger.warning(f"Failed to clean up uploaded file after conversion error: {file_path}")
+            raise HTTPException(
+                status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Failed to process audio file into the required WAV format.",
+            )
         
         # Create audio record with conversion metadata
         audio = audio_service.create_audio(

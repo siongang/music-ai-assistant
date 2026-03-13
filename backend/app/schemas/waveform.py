@@ -2,7 +2,7 @@
 Waveform schemas for API requests/responses.
 """
 from pydantic import BaseModel, Field
-from typing import List, Dict
+from typing import List
 
 
 class WaveformPeak(BaseModel):
@@ -17,7 +17,7 @@ class WaveformResponse(BaseModel):
     level: int = Field(..., description="Samples per second (zoom level)")
     duration: float = Field(..., description="Duration in seconds")
     channels: int = Field(..., description="Number of audio channels")
-    peaks: List[Dict[str, float]] = Field(..., description="Array of min/max peak pairs")
+    peaks: List[WaveformPeak] = Field(..., description="Array of min/max peak pairs")
     
     class Config:
         json_schema_extra = {

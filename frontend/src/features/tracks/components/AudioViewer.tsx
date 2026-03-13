@@ -59,8 +59,25 @@ export function AudioViewer({
     const right = rightPanelRef.current;
     if (!left || !right) return;
 
-    const syncFromLeft = () => { right.scrollTop = left.scrollTop; };
-    const syncFromRight = () => { left.scrollTop = right.scrollTop; };
+    let syncingFrom: 'left' | 'right' | null = null;
+
+    const syncFromLeft = () => {
+      if (syncingFrom === 'right') return;
+      syncingFrom = 'left';
+      right.scrollTop = left.scrollTop;
+      requestAnimationFrame(() => {
+        syncingFrom = null;
+      });
+    };
+
+    const syncFromRight = () => {
+      if (syncingFrom === 'left') return;
+      syncingFrom = 'right';
+      left.scrollTop = right.scrollTop;
+      requestAnimationFrame(() => {
+        syncingFrom = null;
+      });
+    };
 
     left.addEventListener('scroll', syncFromLeft);
     right.addEventListener('scroll', syncFromRight);
@@ -108,6 +125,7 @@ export function AudioViewer({
         })
         .catch((error) => {
           console.error(`Failed to load waveform for ${assetId}:`, error);
+          requestedAssetIdsRef.current.delete(assetId);
           setWaveformData((prev) => new Map(prev).set(assetId, null));
           setLoadingStates((prev) => new Map(prev).set(assetId, false));
         });
