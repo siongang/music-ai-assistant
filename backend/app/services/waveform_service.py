@@ -27,23 +27,23 @@ class WaveformService:
         self.storage_root = storage_root or Path(STORAGE_ROOT)
         self.generator = WaveformGenerator()
     
-    def get_waveform_cache_path(self, audio_id: UUID, level: int) -> Path:
+    def get_waveform_cache_path(self, artifact_id: UUID, level: int) -> Path:
         """
         Get the cache file path for waveform peaks.
         
         Args:
-            audio_id: Audio ID (UUID)
+            artifact_id: Source artifact ID (UUID)
             level: Zoom level (samples per second)
             
         Returns:
             Path to cache file
         """
-        waveform_dir = self.storage_root / "waveforms" / str(audio_id)
+        waveform_dir = self.storage_root / "waveforms" / str(artifact_id)
         return waveform_dir / f"peaks_{level}.json"
     
     def get_waveform_data(
         self,
-        audio_id: UUID,
+        artifact_id: UUID,
         audio_path: Path,
         level: int = 512
     ) -> Dict[str, Any]:
@@ -51,31 +51,31 @@ class WaveformService:
         Get waveform peak data, generating and caching if needed.
         
         Args:
-            audio_id: Audio ID (UUID)
+            artifact_id: Source artifact ID (UUID)
             audio_path: Path to audio WAV file
             level: Zoom level (samples per second)
             
         Returns:
-            Dict with audio_id, level, duration, channels, peaks
+            Dict with artifact_id, level, duration, channels, peaks
         """
         # Check if cached version exists
-        cache_path = self.get_waveform_cache_path(audio_id, level)
+        cache_path = self.get_waveform_cache_path(artifact_id, level)
         
         if cache_path.exists():
             try:
                 logger.info(f"Loading cached waveform data: {cache_path}")
                 peaks_data = self.generator.load_peaks_from_file(cache_path)
-                peaks_data["audio_id"] = str(audio_id)
+                peaks_data["artifact_id"] = str(artifact_id)
                 return peaks_data
             except Exception as e:
                 logger.warning(f"Failed to load cached waveform: {e}, regenerating...")
         
         # Generate waveform peaks
-        logger.info(f"Generating waveform peaks for {audio_id} at level {level}")
+        logger.info(f"Generating waveform peaks for {artifact_id} at level {level}")
         
         try:
             peaks_data = self.generator.generate_peaks(audio_path, level)
-            peaks_data["audio_id"] = str(audio_id)
+            peaks_data["artifact_id"] = str(artifact_id)
             
             # Cache the results
             self.generator.save_peaks_to_file(peaks_data, cache_path)
@@ -83,19 +83,19 @@ class WaveformService:
             return peaks_data
             
         except Exception as e:
-            logger.error(f"Waveform generation failed for {audio_id}: {e}", exc_info=True)
+            logger.error(f"Waveform generation failed for {artifact_id}: {e}", exc_info=True)
             raise
     
     def generate_all_levels(
         self,
-        audio_id: UUID,
+        artifact_id: UUID,
         audio_path: Path
     ) -> Dict[int, Dict[str, Any]]:
         """
         Generate waveform peaks at all supported zoom levels.
         
         Args:
-            audio_id: Audio ID (UUID)
+            artifact_id: Source artifact ID (UUID)
             audio_path: Path to audio WAV file
             
         Returns:
@@ -105,23 +105,23 @@ class WaveformService:
         
         for level in self.generator.ZOOM_LEVELS:
             try:
-                peaks_data = self.get_waveform_data(audio_id, audio_path, level)
+                peaks_data = self.get_waveform_data(artifact_id, audio_path, level)
                 results[level] = peaks_data
             except Exception as e:
                 logger.error(f"Failed to generate level {level}: {e}")
         
         return results
     
-    def clear_cache(self, audio_id: UUID) -> None:
+    def clear_cache(self, artifact_id: UUID) -> None:
         """
         Clear cached waveform data for an audio file.
         
         Args:
-            audio_id: Audio ID (UUID)
+            artifact_id: Source artifact ID (UUID)
         """
-        waveform_dir = self.storage_root / "waveforms" / str(audio_id)
+        waveform_dir = self.storage_root / "waveforms" / str(artifact_id)
         
         if waveform_dir.exists():
             import shutil
             shutil.rmtree(waveform_dir)
-            logger.info(f"Cleared waveform cache for {audio_id}")
+            logger.info(f"Cleared waveform cache for {artifact_id}")

@@ -1,7 +1,7 @@
 """
 Audio Session schemas for API requests/responses.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from datetime import datetime
 
@@ -9,7 +9,7 @@ from datetime import datetime
 class ClipData(BaseModel):
     """Clip placement on timeline."""
     id: str = Field(..., description="Clip ID")
-    assetId: str = Field(..., description="Audio asset ID (backend audio_id)")
+    assetId: str = Field(..., description="Artifact ID for the source or derived audio asset")
     start: float = Field(..., ge=0, description="Timeline position in seconds")
     in_: float = Field(0, ge=0, alias="in", description="Source offset in seconds")
     duration: float = Field(..., gt=0, description="Clip duration in seconds")
@@ -52,8 +52,7 @@ class AudioSessionResponse(BaseModel):
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AudioSessionListItem(BaseModel):
@@ -64,5 +63,4 @@ class AudioSessionListItem(BaseModel):
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_at: datetime = Field(..., description="Creation timestamp")
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

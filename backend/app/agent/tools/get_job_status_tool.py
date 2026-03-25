@@ -30,7 +30,7 @@ class GetJobStatusTool(Tool):
         "type": "object",
         "properties": {
             "job_id": {"type": "string"},
-            "type": {"type": "string"},
+            "capability": {"type": "string"},
             "status": {"type": "string"},
             "progress": {"type": "number"},
             "output": {"type": "object"},
@@ -60,7 +60,7 @@ class GetJobStatusTool(Tool):
         
         result = {
             "job_id": str(job.id),
-            "type": job.type,
+            "capability": job.type,
             "status": job.status,
             "progress": job.progress
         }

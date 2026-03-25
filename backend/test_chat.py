@@ -9,6 +9,8 @@ Usage:
 Make sure the API server is running:
     uvicorn app.main:app --reload
 """
+__test__ = False
+
 import requests
 import sys
 import json

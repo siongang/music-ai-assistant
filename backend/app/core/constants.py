@@ -35,11 +35,14 @@ class JobStatus:
 
 # Job types
 class JobType:
-    """Job type constants"""
+    """Capability-backed job type constants."""
     STEM_SEPARATION = "stem_separation"
-    MIDI_CONVERSION = "midi_conversion"
-    MELODY_EXTRACTION = "melody_extraction"
+    MIDI_TRANSCRIPTION = "midi_transcription"
     CHORD_ANALYSIS = "chord_analysis"
+
+    # Legacy aliases kept for backward compatibility while API clients migrate.
+    MIDI_CONVERSION = MIDI_TRANSCRIPTION
+    MELODY_EXTRACTION = "melody_extraction"
 
 # Storage paths
 # Reads from environment variable, falls back to default for local development
@@ -69,3 +72,12 @@ MIDI_DIR = "midi"
 # File upload limits
 MAX_FILE_SIZE_MB = 500  # Maximum file size in megabytes
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024  # Convert to bytes
+
+# Default providers for each capability.
+# To swap a model: change the value here. No other code should need to change.
+DEFAULT_PROVIDERS: dict[str, str] = {
+    "stem_separation":   "demucs_htdemucs",
+    "midi_transcription": "basic_pitch_v2",
+    # "chord_analysis":  not yet registered
+    # "key_detection":   not yet registered
+}

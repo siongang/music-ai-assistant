@@ -4,15 +4,19 @@ Project-scoped job endpoints.
 Projects OWN jobs. Job creation and listing require project_id in the URL.
 Correct route: POST /projects/{project_id}/jobs (not POST /jobs).
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status as http_status
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID, uuid4
-import logging
 
 from app.db.session import get_db
+from app.artifacts.service import ArtifactService
+from app.capabilities.registry import CapabilityRegistry
+from app.core.constants import DEFAULT_PROVIDERS
+from app.providers.registry import ProviderRegistry, initialize_provider_registry
 from app.services.job_service import JobService
-from app.services.audio_service import AudioService
 from app.services.project_service import ProjectService
 from app.schemas.job import JobResponse, JobCreate
 from app.core.constants import JobType
@@ -23,13 +27,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["project-jobs"])
 
 
+def _serialize_validation_errors(exc: ValidationError) -> list[dict]:
+    serialized: list[dict] = []
+    for error in exc.errors():
+        item = dict(error)
+        ctx = item.get("ctx")
+        if ctx:
+            item["ctx"] = {key: str(value) for key, value in ctx.items()}
+        serialized.append(item)
+    return serialized
+
+
 def _build_job_response(job) -> JobResponse:
-    audio_id = UUID(job.input.get("audio_id"))
+    provider_key = (job.params or {}).get("provider_key") or DEFAULT_PROVIDERS.get(job.type)
     return JobResponse(
         job_id=job.id,
-        type=job.type,
+        capability=job.type,
+        provider_key=provider_key,
         status=job.status,
-        audio_id=audio_id,
         project_id=job.project_id,
         input=job.input,
         params=job.params,
@@ -45,8 +60,8 @@ def get_job_service(db: Session = Depends(get_db)) -> JobService:
     return JobService(db)
 
 
-def get_audio_service(db: Session = Depends(get_db)) -> AudioService:
-    return AudioService(db)
+def get_artifact_service(db: Session = Depends(get_db)) -> ArtifactService:
+    return ArtifactService(db)
 
 
 def get_project_service(db: Session = Depends(get_db)) -> ProjectService:
@@ -66,43 +81,84 @@ def create_project_job(
     project_id: UUID,
     body: JobCreate,
     job_service: JobService = Depends(get_job_service),
-    audio_service: AudioService = Depends(get_audio_service),
+    artifact_service: ArtifactService = Depends(get_artifact_service),
     project_service: ProjectService = Depends(get_project_service),
 ):
     """
     Create a job in a project. Project owns the job.
-    Input audio_id must belong to the same project.
+    Input must be an artifact in the same project.
     """
     _ensure_project(project_service, project_id)
-    audio_id = body.input.audio_id
-    audio = audio_service.get_audio(audio_id)
-    if not audio:
-        raise HTTPException(
-            status_code=http_status.HTTP_404_NOT_FOUND,
-            detail=f"Audio {audio_id} not found",
-        )
-    if audio.project_id != project_id:
-        raise HTTPException(
-            status_code=http_status.HTTP_400_BAD_REQUEST,
-            detail="Audio must belong to this project",
-        )
+    requested_capability = body.requested_capability
     valid_types = [
         JobType.STEM_SEPARATION,
-        JobType.MIDI_CONVERSION,
-        JobType.MELODY_EXTRACTION,
+        JobType.MIDI_TRANSCRIPTION,
         JobType.CHORD_ANALYSIS,
     ]
-    if body.type not in valid_types:
+    normalized_capability = job_service.normalize_job_type(requested_capability)
+    if normalized_capability not in valid_types:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid job type. Valid: {', '.join(valid_types)}",
         )
+    capability_definition = CapabilityRegistry.get(normalized_capability)
+    if capability_definition is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Capability {normalized_capability} not found",
+        )
+    if capability_definition.status != "available":
+        raise HTTPException(
+            status_code=http_status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Capability {normalized_capability} is not available",
+        )
+    validated_params = body.params or {}
+    if capability_definition.job_params_schema is not None:
+        try:
+            validated_params = capability_definition.job_params_schema(**validated_params).model_dump(
+                exclude_none=True
+            )
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=_serialize_validation_errors(exc),
+            ) from exc
+    initialize_provider_registry()
+    requested_provider_key = validated_params.get("provider_key")
+    resolved_provider_key = requested_provider_key or DEFAULT_PROVIDERS.get(normalized_capability)
+    if resolved_provider_key is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"No provider configured for capability {normalized_capability}",
+        )
+    try:
+        provider = ProviderRegistry.get(normalized_capability, resolved_provider_key)
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    if not provider.is_available:
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Provider {resolved_provider_key} is not available in this environment",
+        )
+
+    input_payload: dict[str, str] = {}
+    artifact = artifact_service.get(body.input.input_artifact_id)
+    if artifact is None or artifact.project_id != project_id:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact {body.input.input_artifact_id} not found in project",
+        )
+    input_payload["input_artifact_id"] = str(artifact.id)
+
     job_id = uuid4()
     job = job_service.create_job(
         job_id=job_id,
-        job_type=body.type,
-        input_data={"audio_id": str(audio_id)},
-        params=body.params,
+        job_type=normalized_capability,
+        input_data=input_payload,
+        params=validated_params,
         project_id=project_id,
     )
     try:

@@ -52,7 +52,7 @@ class Job(Base):
     Job model: an audio processing job owned by a project.
 
     Projects own jobs; jobs cannot exist without a project.
-    Jobs reference inputs (e.g. audio_id) and produce outputs under the project;
+    Jobs reference artifact inputs and produce outputs under the project;
     they never own data. Deleting a project cascades to its jobs.
 
     Job lifecycle:
@@ -66,7 +66,7 @@ class Job(Base):
         project_id: Project that owns this job (required)
         type: Job type (e.g., "stem_separation", "melody_extraction")
         status: Current job status
-        input: JSON object containing input data (e.g., {"audio_id": "..."})
+        input: JSON object containing input data (e.g., {"input_artifact_id": "..."})
         params: JSON object containing job parameters (e.g., {"model": "demucs_v4"})
         output: JSON object containing output data (e.g., {"vocals": "...", "drums": "..."})
         progress: Progress value (0.0 to 1.0)

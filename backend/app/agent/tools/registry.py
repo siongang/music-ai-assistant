@@ -93,14 +93,12 @@ class ToolRegistry:
             raise RuntimeError(f"Tool {tool_name} failed: {str(e)}") from e
 
 
-def create_default_registry(job_service, audio_service) -> ToolRegistry:
+def create_default_registry(job_service, artifact_service) -> ToolRegistry:
     """
     Create and populate default tool registry.
     
     Args:
         job_service: JobService instance
-        audio_service: AudioService instance
-    
     Returns:
         Configured ToolRegistry
     """
@@ -111,8 +109,8 @@ def create_default_registry(job_service, audio_service) -> ToolRegistry:
     registry = ToolRegistry()
     
     # Register tools
-    registry.register(SeparateStemsTool(job_service, audio_service))
-    registry.register(ConvertToMidiTool(job_service, audio_service))
+    registry.register(SeparateStemsTool(job_service, artifact_service))
+    registry.register(ConvertToMidiTool(job_service, artifact_service))
     registry.register(GetJobStatusTool(job_service))
     
     return registry

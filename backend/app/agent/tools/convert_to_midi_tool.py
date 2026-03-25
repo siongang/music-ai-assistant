@@ -2,6 +2,8 @@
 from uuid import UUID, uuid4
 from typing import Dict, Any, Optional
 import logging
+
+from app.capabilities.registry import CapabilityRegistry
 from app.agent.tools.base import Tool
 from app.core.constants import JobType
 from app.tasks.job_tasks import process_audio_job
@@ -21,9 +23,9 @@ class ConvertToMidiTool(Tool):
     parameters = {
         "type": "object",
         "properties": {
-            "audio_id": {
+            "input_artifact_id": {
                 "type": "string",
-                "description": "UUID of the audio file to convert"
+                "description": "Source artifact UUID to convert"
             },
             "midi_tempo": {
                 "type": "integer",
@@ -32,7 +34,7 @@ class ConvertToMidiTool(Tool):
                 "maximum": 300
             }
         },
-        "required": ["audio_id"]
+        "required": ["input_artifact_id"]
     }
     returns = {
         "type": "object",
@@ -43,27 +45,27 @@ class ConvertToMidiTool(Tool):
         }
     }
     
-    def __init__(self, job_service, audio_service):
+    def __init__(self, job_service, artifact_service):
         self.job_service = job_service
-        self.audio_service = audio_service
+        self.artifact_service = artifact_service
     
-    def execute(self, audio_id: str, midi_tempo: Optional[int] = None) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_artifact_id: str,
+        midi_tempo: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """Create MIDI conversion job."""
-        logger.info(f"[TOOL] convert_to_midi | Starting | audio_id={audio_id} | midi_tempo={midi_tempo}")
-        
-        try:
-            audio_uuid = UUID(audio_id)
-        except ValueError:
-            logger.error(f"[TOOL] convert_to_midi | Invalid audio_id format | audio_id={audio_id}")
-            raise ValueError(f"Invalid audio_id format: {audio_id}")
-        
-        # Validate audio exists and get project (jobs are project-owned)
-        audio = self.audio_service.get_audio(audio_uuid)
-        if not audio:
-            logger.error(f"[TOOL] convert_to_midi | Audio not found | audio_id={audio_id}")
-            raise ValueError(f"Audio {audio_id} not found")
-        project_id = audio.project_id
-        logger.debug(f"[TOOL] convert_to_midi | Audio validated | audio_id={audio_id} | project_id={project_id}")
+        logger.info(
+            f"[TOOL] convert_to_midi | Starting | input_artifact_id={input_artifact_id} | midi_tempo={midi_tempo}"
+        )
+        capability = CapabilityRegistry.get(JobType.MIDI_TRANSCRIPTION)
+        if capability is None or capability.status != "available":
+            return {"status": "unavailable"}
+        source_artifact = self.artifact_service.get_required(UUID(input_artifact_id))
+        project_id = source_artifact.project_id
+        logger.debug(
+            f"[TOOL] convert_to_midi | Input validated | input_artifact_id={source_artifact.id} | project_id={project_id}"
+        )
         
         # Prepare params
         params = {}
@@ -73,12 +75,15 @@ class ConvertToMidiTool(Tool):
         
         # Create job (project owns the job)
         job_id = uuid4()
-        logger.info(f"[TOOL] convert_to_midi | Creating job | job_id={job_id} | audio_id={audio_id} | params={params}")
+        logger.info(
+            f"[TOOL] convert_to_midi | Creating job | job_id={job_id} | "
+            f"input_artifact_id={source_artifact.id} | params={params}"
+        )
         
         job = self.job_service.create_job(
             job_id=job_id,
-            job_type=JobType.MIDI_CONVERSION,
-            input_data={"audio_id": audio_id},
+            job_type=JobType.MIDI_TRANSCRIPTION,
+            input_data={"input_artifact_id": str(source_artifact.id)},
             params=params,
             project_id=project_id,
         )

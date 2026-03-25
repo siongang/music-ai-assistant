@@ -3,7 +3,7 @@ Project Pydantic schemas for API request/response validation.
 
 Matches frontend ApiProject shape (snake_case) for compatibility.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from typing import Optional, Dict, Any
 from uuid import UUID
@@ -47,8 +47,7 @@ class ProjectResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProjectListItem(BaseModel):
@@ -59,8 +58,7 @@ class ProjectListItem(BaseModel):
     updated_at: datetime
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TreeSnapshot(BaseModel):

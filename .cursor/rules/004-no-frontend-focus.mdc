@@ -1,0 +1,27 @@
+---
+description: Frontend scope limiter — backend is the product right now
+globs: ["frontend/**/*"]
+alwaysApply: false
+---
+
+# Frontend Scope Rules
+
+## Current Status
+
+The frontend is intentionally parked. The backend is the product right now.
+
+## What Is Acceptable Frontend Work
+
+- Bug fixes that block backend validation
+- Adding a minimal UI element to expose a new backend capability for testing
+- API integration for a new endpoint
+
+## What Is NOT Acceptable Frontend Work Right Now
+
+- UI redesign or polish
+- New UI components not directly tied to a backend capability
+- Performance optimization of the frontend
+- Adding frontend libraries or dependencies
+
+If asked to improve the frontend significantly, redirect to backend work first.
+The frontend will be revisited once the backend capability pipeline is stable.

@@ -3,20 +3,25 @@ Database session management.
 
 This module handles database connection and session creation.
 """
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
 # Database connection URL
 # Reads from environment variable, falls back to default for local development
-import os
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "sqlite:///./test.db"  # Using SQLite for easy setup - no PostgreSQL needed!
 )
 
+engine_kwargs = {"echo": False}
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+
 # Create database engine
 # echo=False means SQL queries won't be logged (set to True for debugging)
-engine = create_engine(DATABASE_URL, echo=False)
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 # Create session factory
 # autocommit=False: Changes must be explicitly committed
