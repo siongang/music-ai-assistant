@@ -1,0 +1,37 @@
+---
+description: Core context that must be read before any backend change
+globs: ["backend/**/*.py"]
+alwaysApply: true
+---
+
+# Read Before You Code
+
+Before making any backend change, you must internalize these documents:
+
+1. `docs/ARCHITECTURE.md` — layer rules, core concepts, what goes where
+2. `docs/CAPABILITIES.md` — what capabilities exist and their current status
+3. `docs/TECH_DEBT.md` — what is broken, what to avoid touching until fixed
+4. `docs/DEV_PROCESS.md` — the workflow you must follow
+
+## Non-Negotiable Layer Rules
+
+```
+API Endpoints  →  Services  →  Job Handlers  →  Providers (via registry)
+```
+
+- ONLY `backend/app/providers/**` may import model libraries (demucs, basic_pitch, etc.)
+- Services may NOT import providers directly
+- Job handlers call providers ONLY via `ProviderRegistry.get(...)`
+- API endpoints call services; they do not touch model code
+
+If you are about to import `demucs`, `basic_pitch`, `torch`, or any ML library
+outside of a `providers/` module, STOP and reconsider.
+
+## State Your Plan First
+
+For any change touching more than 2 files, write 2–3 sentences explaining:
+- What layer this belongs to
+- How it connects to the capability/provider/artifact architecture
+- What existing code it replaces or extends
+
+Do not generate code until the plan is clear.

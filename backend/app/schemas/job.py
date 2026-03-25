@@ -3,7 +3,7 @@ Job Pydantic schemas for API request/response validation.
 
 These schemas define the structure of job data for API endpoints.
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, model_validator
 from datetime import datetime
 from typing import Optional, Dict, Any
 from uuid import UUID
@@ -11,13 +11,7 @@ from uuid import UUID
 
 class JobInput(BaseModel):
     """Input data for a job."""
-    audio_id: UUID
-
-
-class JobParams(BaseModel):
-    """Job parameters."""
-    model: Optional[str] = None
-    # Add other parameters as needed
+    input_artifact_id: UUID
 
 
 class JobCreate(BaseModel):
@@ -26,14 +20,25 @@ class JobCreate(BaseModel):
 
     Example:
     {
-        "type": "stem_separation",
-        "input": { "audio_id": "audio_abc123" },
-        "params": { "model": "demucs_v4" }
+        "capability": "stem_separation",
+        "input": { "input_artifact_id": "uuid" },
+        "params": { "provider_key": "demucs_htdemucs" }
     }
     """
-    type: str
+    capability: Optional[str] = None
+    type: Optional[str] = None
     input: JobInput
     params: Optional[Dict[str, Any]] = None
+
+    @model_validator(mode="after")
+    def validate_capability_name(self):
+        if not self.capability and not self.type:
+            raise ValueError("Either capability or type is required")
+        return self
+
+    @property
+    def requested_capability(self) -> str:
+        return self.capability or self.type or ""
 
 
 class JobOutput(BaseModel):
@@ -48,9 +53,9 @@ class JobOutput(BaseModel):
 class JobResponse(BaseModel):
     """Schema for job response data."""
     job_id: UUID
-    type: str
+    capability: str
+    provider_key: Optional[str] = None
     status: str
-    audio_id: UUID
     project_id: UUID
     input: Dict[str, Any]
     params: Optional[Dict[str, Any]] = None
@@ -60,6 +65,4 @@ class JobResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
-        populate_by_name = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)

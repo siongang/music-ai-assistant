@@ -1,0 +1,49 @@
+---
+description: Rules for the LLM agent tool implementations
+globs: ["backend/app/agent/**/*.py"]
+alwaysApply: true
+---
+
+# LLM Agent Tool Rules
+
+## What Agent Tools May Do
+
+- Call services (e.g., `JobService`, `ArtifactService`, `ProjectService`)
+- Read artifact metadata from the database
+- Create jobs via `JobService.create_job()`
+- Return structured data to the agent for reasoning
+
+## What Agent Tools Must NOT Do
+
+- Import or call provider code directly
+- Import model libraries (demucs, basic_pitch, etc.)
+- Run ML inference inline (all ML work must go through the job system)
+- Block waiting for a job to complete
+
+## Handling Confidence in Agent Responses
+
+When the agent presents results to the user, it must:
+
+1. **Check confidence.** Retrieve it from the artifact's metadata.
+2. **Communicate uncertainty** when confidence is present and low by the product's current policy.
+3. **Treat missing confidence honestly.** If no reliability score is available, do not invent one.
+4. **Not fabricate** musical analysis that wasn't produced by a capability.
+
+## Tool Return Format
+
+Agent tools should return structured dicts that include:
+- `status`: "succeeded" | "failed" | "pending"
+- `artifact_ids`: list of relevant artifact UUIDs
+- `summary`: human-readable description of what was done
+- `confidence`: top-level confidence if applicable
+- `warnings`: list of strings for agent to relay to user
+
+## Unimplemented Capabilities
+
+If a user asks for a capability that has no registered provider (e.g., chord analysis),
+the tool should return:
+```python
+{"status": "unavailable", "reason": "chord_analysis provider not yet registered"}
+```
+The agent should say: "Chord analysis is not yet available in this version."  
+It must NOT make up chord information.

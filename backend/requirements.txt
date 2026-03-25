@@ -12,6 +12,8 @@ python-multipart
 jsonschema
 openai
 python-dotenv
+pytest
+alembic
 
 # demucs
 # IMPORTANT: PyTorch must be installed separately BEFORE installing other packages!

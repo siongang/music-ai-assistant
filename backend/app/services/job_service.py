@@ -4,14 +4,15 @@ Job service for database operations.
 This service handles all database operations related to jobs,
 including creation, retrieval, and status updates.
 """
-from sqlalchemy.orm import Session
-from typing import Optional, List, Dict, Any
-from uuid import UUID
 import logging
+from typing import Any, Dict, List, Optional
+from uuid import UUID
 
+from sqlalchemy.orm import Session
+
+from app.capabilities.registry import CapabilityRegistry
 from app.models.job import Job
 from app.core.constants import JobStatus, JobType
-from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +58,10 @@ class JobService:
         Returns:
             Created Job object
         """
+        normalized_job_type = self.normalize_job_type(job_type)
         job = Job(
             id=job_id,
-            type=job_type,
+            type=normalized_job_type,
             input=input_data,
             params=params,
             status=status,
@@ -68,8 +70,21 @@ class JobService:
         self.db.add(job)
         self.db.commit()
         self.db.refresh(job)
-        logger.debug(f"Created job: {job_id} with type: {job_type}, status: {status}")
+        logger.debug(f"Created job: {job_id} with type: {normalized_job_type}, status: {status}")
         return job
+
+    @staticmethod
+    def normalize_job_type(job_type: str) -> str:
+        alias_map = {
+            JobType.MIDI_CONVERSION: JobType.MIDI_TRANSCRIPTION,
+        }
+        return alias_map.get(job_type, job_type)
+
+    def validate_capability(self, job_type: str) -> str:
+        normalized_job_type = self.normalize_job_type(job_type)
+        if CapabilityRegistry.get(normalized_job_type) is None:
+            raise ValueError(f"Unknown capability: {job_type}")
+        return normalized_job_type
 
     def get_job(self, job_id: UUID) -> Optional[Job]:
         """
@@ -152,5 +167,5 @@ class JobService:
         if status:
             query = query.filter(Job.status == status)
         if job_type:
-            query = query.filter(Job.type == job_type)
+            query = query.filter(Job.type == self.normalize_job_type(job_type))
         return query.order_by(Job.created_at.desc()).limit(limit).offset(offset).all()

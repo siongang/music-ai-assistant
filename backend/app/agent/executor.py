@@ -43,12 +43,13 @@ Important:
 - Always create jobs first, then check their status
 - You cannot analyze music theory yet (no chord detection, key detection, etc.)
 - Be helpful and explain what you're doing
+- Jobs are artifact-backed. Output results are references to generated artifacts, not inline files
+- If a tool reports that no confidence or reliability score exists, do not invent one
 
 Audio context:
 - This chat session is scoped to ONE primary audio file (provided below)
 - When the user says "the song", "the audio", "that file", "it", or similar references, they mean the primary audio for this session
-- You should use the primary audio_id automatically - do not ask the user for it
-- If the user explicitly provides a different audio_id, use that instead
+- Prefer using the primary artifact id automatically - do not ask the user for it
 - The primary audio context will be provided in the system prompt below
 
 When users ask to process audio, use the appropriate tool and explain what's happening."""
@@ -135,7 +136,11 @@ When users ask to process audio, use the appropriate tool and explain what's hap
         # Get primary audio for this session
         primary_audio = self.sessions.get_primary_audio(session_id)
         if primary_audio:
-            logger.info(f"[AGENT] Primary audio context | session={session_id} | audio_id={primary_audio['audio_id']} | filename={primary_audio.get('filename', 'unknown')}")
+            logger.info(
+                f"[AGENT] Primary audio context | session={session_id} | "
+                f"artifact_id={primary_audio.get('artifact_id')} | "
+                f"filename={primary_audio.get('filename', 'unknown')}"
+            )
         else:
             logger.info(f"[AGENT] No primary audio | session={session_id}")
         
@@ -143,12 +148,14 @@ When users ask to process audio, use the appropriate tool and explain what's hap
         system_prompt = self.SYSTEM_PROMPT
         if primary_audio:
             audio_context = "\n\n**Active Audio Context:**\n"
-            audio_context += f"- audio_id: {primary_audio['audio_id']}\n"
+            audio_context += f"- input_artifact_id: {primary_audio['artifact_id']}\n"
             if "filename" in primary_audio:
                 audio_context += f"- filename: {primary_audio['filename']}\n"
             audio_context += "\nWhen the user refers to 'the song', 'the audio', 'that file', 'it', or similar, "
-            audio_context += f"they mean this audio (audio_id: {primary_audio['audio_id']}). "
-            audio_context += "Use this audio_id automatically in tool calls unless the user explicitly provides a different one."
+            audio_context += (
+                f"they mean this uploaded source artifact ({primary_audio['artifact_id']}). "
+                f"Prefer input_artifact_id {primary_audio['artifact_id']} in tool calls."
+            )
             system_prompt = system_prompt + audio_context
         else:
             # No primary audio set - inform LLM to ask user to upload

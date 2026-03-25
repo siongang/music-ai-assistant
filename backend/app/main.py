@@ -17,9 +17,9 @@ from app.db.session import engine
 env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-# Import all models so they're registered with SQLAlchemy
-# This ensures tables are created on startup (Project must be before Audio/Job for FK)
-from app.models import Project, Session, AgentStep, Job, Audio  # noqa: F401
+# Import all models so they're registered with SQLAlchemy.
+from app.models import Project, Session, AgentStep, Job, Artifact  # noqa: F401
+from app.providers.registry import initialize_provider_registry
 
 # Configure logging
 logging.basicConfig(
@@ -36,6 +36,8 @@ try:
 except Exception as e:
     # Log but don't fail startup - tables might already exist or DB might not be ready yet
     logging.warning(f"Could not create tables on startup: {e}")
+
+initialize_provider_registry()
 
 # Create FastAPI application instance
 app = FastAPI(

@@ -213,9 +213,15 @@ class SessionService:
         logger.debug(f"[SESSION] Retrieved messages for LLM | session_id={session_id} | message_count={len(messages)}")
         return messages
     
-    def set_primary_audio(self, session_id: UUID, audio_id: str, filename: Optional[str] = None):
+    def set_primary_artifact(
+        self,
+        session_id: UUID,
+        artifact_id: str,
+        filename: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ):
         """
-        Set the primary audio for this session.
+        Set the primary source artifact for this session.
         
         **Beta Design: One audio per session**
         Each session has exactly one primary audio. Setting a new primary audio
@@ -223,40 +229,48 @@ class SessionService:
         
         Args:
             session_id: Session UUID
-            audio_id: Audio UUID to set as primary
+            artifact_id: Source artifact UUID to set as primary
             filename: Optional filename for display
+            project_id: Optional project id for the uploaded audio
         """
         session = self.get_or_create_session(session_id)
         if not session.session_metadata:
             session.session_metadata = {}
         
-        session.session_metadata["primary_audio_id"] = audio_id
+        session.session_metadata["primary_artifact_id"] = artifact_id
         if filename:
             session.session_metadata["primary_audio_filename"] = filename
+        if project_id:
+            session.session_metadata["project_id"] = project_id
         
         self.db.commit()
-        logger.info(f"[SESSION] Set primary audio | session_id={session_id} | audio_id={audio_id} | filename={filename}")
+        logger.info(
+            f"[SESSION] Set primary artifact | session_id={session_id} | artifact_id={artifact_id} | "
+            f"project_id={project_id} | filename={filename}"
+        )
     
     def get_primary_audio(self, session_id: UUID) -> Optional[Dict[str, str]]:
         """
-        Get the primary audio for this session.
+        Get the primary uploaded source for this session.
         
         Args:
             session_id: Session UUID
         
         Returns:
-            Dict with "audio_id" and optionally "filename", or None if no primary audio set
+            Dict with "artifact_id" and optionally "filename", or None if no primary artifact set
         """
         session = self.get_session(session_id)
         if not session or not session.session_metadata:
             return None
         
-        audio_id = session.session_metadata.get("primary_audio_id")
-        if not audio_id:
+        artifact_id = session.session_metadata.get("primary_artifact_id")
+        if not artifact_id:
             return None
         
-        result = {"audio_id": audio_id}
+        result = {"artifact_id": artifact_id}
         if "primary_audio_filename" in session.session_metadata:
             result["filename"] = session.session_metadata["primary_audio_filename"]
+        if "project_id" in session.session_metadata:
+            result["project_id"] = session.session_metadata["project_id"]
         
         return result

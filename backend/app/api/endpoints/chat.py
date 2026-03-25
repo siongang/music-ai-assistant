@@ -4,20 +4,21 @@ from sqlalchemy.orm import Session
 from uuid import UUID, uuid4
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
-from pathlib import Path
 import logging
 
 import os
 from app.db.session import get_db
+from app.artifacts.service import ArtifactService
 from app.services.job_service import JobService
-from app.services.audio_service import AudioService
+from app.services.project_service import ProjectService
+from app.services.audio_conversion_service import AudioConversionService
 from app.agent.executor import AgentExecutor
 from app.agent.session_service import SessionService
 from app.agent.llm_client import create_llm_client
 from app.agent.tools.registry import create_default_registry
 from app.storage.local_storage import LocalStorage
 from app.core.constants import STORAGE_ROOT
-from app.schemas.audio import AudioResponse
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -44,15 +45,20 @@ class SessionCreateResponse(BaseModel):
     created_at: str
 
 
-# Dependencies
-def get_audio_service(db: Session = Depends(get_db)) -> AudioService:
-    """Dependency for getting AudioService instance."""
-    return AudioService(db)
+def get_project_service(db: Session = Depends(get_db)) -> ProjectService:
+    return ProjectService(db)
+
+
+def get_artifact_service(db: Session = Depends(get_db)) -> ArtifactService:
+    return ArtifactService(db)
 
 
 def get_storage() -> LocalStorage:
-    """Dependency for getting LocalStorage instance."""
     return LocalStorage(root=Path(STORAGE_ROOT))
+
+
+def get_conversion_service() -> AudioConversionService:
+    return AudioConversionService(storage_root=Path(STORAGE_ROOT))
 
 
 def get_agent_executor(db: Session = Depends(get_db)) -> AgentExecutor:
@@ -63,11 +69,11 @@ def get_agent_executor(db: Session = Depends(get_db)) -> AgentExecutor:
     """
     # Create services
     job_service = JobService(db)
-    audio_service = AudioService(db)
+    artifact_service = ArtifactService(db)
     session_service = SessionService(db)
     
     # Create tool registry
-    tool_registry = create_default_registry(job_service, audio_service)
+    tool_registry = create_default_registry(job_service, artifact_service)
     
     # Create LLM client (using Responses API)
     # Model can be configured via OPENAI_MODEL or LLM_MODEL env var (default: gpt-5)
@@ -159,16 +165,13 @@ def send_message_with_upload(
     file: Optional[UploadFile] = File(None),
     executor: AgentExecutor = Depends(get_agent_executor),
     db: Session = Depends(get_db),
-    audio_service: AudioService = Depends(get_audio_service),
-    storage: LocalStorage = Depends(get_storage)
+    project_service: ProjectService = Depends(get_project_service),
+    artifact_service: ArtifactService = Depends(get_artifact_service),
 ):
     """
     Send a message to the agent with optional audio file upload.
     
-    **Beta Design: One audio per session**
-    - If a file is uploaded, it becomes the primary audio for this session
-    - If the session already has a primary audio, uploading a new file replaces it
-    - For a cleaner UX, consider creating a new session for new audio (Option A)
+    Upload a source artifact into the session's project and process a message.
     
     Args:
         session_id: Optional session ID (creates new if not provided)
@@ -176,13 +179,10 @@ def send_message_with_upload(
         file: Optional audio file to upload
         executor: Agent executor (injected)
         db: Database session
-        audio_service: Audio service (injected)
-        storage: Storage service (injected)
-    
     Returns:
         ChatMessageResponse with agent's reply
     """
-    from app.api.endpoints.audio import upload_audio  # Reuse upload logic
+    from app.api.endpoints.project_artifacts import upload_source_audio
     
     # Create or use existing session
     session_id = session_id or uuid4()
@@ -195,19 +195,45 @@ def send_message_with_upload(
         # Check if session already has a primary audio
         existing_audio = session_service.get_primary_audio(session_id)
         if existing_audio:
-            logger.warning(f"[CHAT] Replacing existing audio | session={session_id} | old_audio_id={existing_audio['audio_id']}")
+            logger.warning(
+                f"[CHAT] Replacing existing source artifact | session={session_id} | "
+                f"old_artifact_id={existing_audio.get('artifact_id')}"
+            )
             # Option: Could return error here and require new session instead
         
-        # Upload audio (reuse existing upload endpoint logic)
+        project_id = None
+        if existing_audio and existing_audio.get("project_id"):
+            project_id = UUID(existing_audio["project_id"])
+        else:
+            project = project_service.create_project(name=f"Chat Upload {file.filename or 'Audio'}")
+            project_id = project.id
+
+        # Upload audio into a real project scope
         logger.info(f"[CHAT] Uploading audio file | session={session_id}")
-        audio_response = upload_audio(file=file, audio_service=audio_service, storage=storage)
-        audio_id = str(audio_response.audio_id)
-        filename = audio_response.filename
-        logger.info(f"[CHAT] Audio uploaded | session={session_id} | audio_id={audio_id} | filename={filename}")
+        upload_response = upload_source_audio(
+            project_id=project_id,
+            file=file,
+            artifact_service=artifact_service,
+            project_service=project_service,
+            storage=get_storage(),
+            conversion_service=get_conversion_service(),
+        )
+        source_artifact_id = str(upload_response.artifact_id)
+        filename = upload_response.filename
+        logger.info(
+            f"[CHAT] Source audio uploaded | session={session_id} | artifact_id={source_artifact_id} | filename={filename}"
+        )
         
         # Set as primary audio for this session
-        session_service.set_primary_audio(session_id, audio_id, filename)
-        logger.info(f"[CHAT] Set primary audio | session={session_id} | audio_id={audio_id}")
+        session_service.set_primary_artifact(
+            session_id=session_id,
+            artifact_id=source_artifact_id,
+            filename=filename,
+            project_id=str(project_id),
+        )
+        logger.info(
+            f"[CHAT] Set primary artifact | session={session_id} | artifact_id={source_artifact_id}"
+        )
         
         # Update message to include audio context if message is empty
         if not message:

@@ -2,7 +2,7 @@
 Project service for database operations.
 
 Handles project CRUD, object tree snapshot (GET/PUT), and cascade delete
-(project owns audio and jobs; deleting a project deletes their DB rows and storage).
+(project owns artifacts and jobs; deleting a project deletes their DB rows and storage).
 """
 import shutil
 import logging
@@ -12,8 +12,9 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.artifacts.schemas import ArtifactType
+from app.models.artifact import Artifact
 from app.models.project import Project
-from app.models.audio import Audio
 from app.models.job import Job
 from app.core.constants import STORAGE_ROOT, AUDIO_DIR, JOBS_DIR
 
@@ -103,16 +104,19 @@ class ProjectService:
     def delete_project(self, project_id: UUID) -> bool:
         """
         Delete a project and all owned data.
-        Removes project's audio and job storage, then deletes project (CASCADE removes audio/job rows).
+        Removes project's artifact and job storage, then deletes project.
         Returns True if deleted.
         """
         project = self.get_project(project_id)
         if not project:
             return False
         root = Path(STORAGE_ROOT)
-        # Delete storage for all audio owned by this project (before CASCADE removes rows)
-        for audio in self.db.query(Audio).filter(Audio.project_id == project_id).all():
-            audio_dir = root / AUDIO_DIR / str(audio.id)
+        # Delete storage for all source audio artifacts owned by this project
+        for artifact in self.db.query(Artifact).filter(
+            Artifact.project_id == project_id,
+            Artifact.type == ArtifactType.AUDIO_FILE.value,
+        ).all():
+            audio_dir = root / AUDIO_DIR / str(artifact.id)
             if audio_dir.exists():
                 try:
                     shutil.rmtree(audio_dir)

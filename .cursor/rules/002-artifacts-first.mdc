@@ -1,0 +1,60 @@
+---
+description: Artifact creation and lineage rules for all job handlers
+globs: ["backend/app/jobs/**/*.py", "backend/app/tasks/**/*.py", "backend/app/workers/**/*.py"]
+alwaysApply: true
+---
+
+# Artifact Rules
+
+## Every File Must Be an Artifact
+
+Any file produced by a job MUST be recorded as an `ArtifactRecord` in the database.
+Do NOT store file paths only in `job.output` as raw JSON strings.
+
+## Required Artifact Fields
+
+When creating an artifact, always populate:
+
+```python
+ArtifactRecord(
+    type=ArtifactType.STEM_AUDIO,          # use the enum, not a string
+    project_id=job.project_id,
+    producing_job_id=job.id,
+    parent_artifact_id=input_artifact.id,  # REQUIRED — maintains lineage
+    storage_path="...",                     # relative to storage root
+    metadata=ArtifactMetadata(
+        confidence=0.82,                   # optional; only when real or explicitly heuristic
+        model_metadata=ModelMetadata(...), # REQUIRED — what model ran
+        stem_name="vocals",                # type-specific fields
+    )
+)
+```
+
+## Why Lineage Matters
+
+- The LLM agent can query: "what stems were produced from this audio?"
+- Users can see the provenance chain: audio → stem → midi
+- Artifact reuse: if the same operation was run on the same input, skip it
+- Debugging: when a model produces bad output, we know exactly which model version ran
+
+## Artifact Reuse Check
+
+Before dispatching a new job, check for an existing artifact:
+```python
+existing = artifact_service.find_matching(
+    parent_artifact_id=input_artifact.id,
+    capability=job.capability,
+    provider_key=resolved_provider_key,
+    params_hash=hash_params(job.input_params),
+)
+if existing:
+    return existing  # skip re-running the model
+```
+
+## What NOT to Do
+
+- Do NOT save files and only record their paths in `job.output` as strings
+- Do NOT create artifacts without a `parent_artifact_id` (except for source uploads)
+- Do NOT omit `model_metadata` from artifact metadata
+- Do NOT set `confidence=1.0` as a default
+- Do use `null` when no trustworthy confidence exists

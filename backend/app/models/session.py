@@ -12,11 +12,11 @@ class Session(Base):
     
     Each session represents a conversation thread with the agent.
     
-    **Beta Design: One primary audio per session**
-    - Each session is scoped to a single primary audio file
-    - The primary_audio_id is stored in metadata
-    - All conversation actions implicitly refer to this audio
-    - To work with a different audio, create a new session
+    **Beta Design: One primary source artifact per session**
+    - Each session is scoped to a single primary uploaded source artifact
+    - The primary_artifact_id is stored in metadata
+    - All conversation actions implicitly refer to this artifact
+    - To work with a different source, create a new session
     
     Sessions can be associated with users (future) and store metadata.
     """
@@ -30,7 +30,7 @@ class Session(Base):
     # Session metadata
     # Expected structure:
     # {
-    #   "primary_audio_id": "uuid-string",
+    #   "primary_artifact_id": "uuid-string",
     #   "primary_audio_filename": "song.mp3",
     #   ... other metadata
     # }

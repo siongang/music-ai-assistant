@@ -65,10 +65,11 @@ The backend is primarily configured through environment variables:
 The stable API shape is:
 
 - project routes under `/api/projects`
-- project-owned audio under `/api/projects/{project_id}/audio`
+- project-owned source/media artifacts under `/api/projects/{project_id}/artifacts`
 - project-owned jobs under `/api/projects/{project_id}/jobs`
+- capability/provider discovery under `/api/capabilities`
 - chat routes under `/api/chat`
-- file downloads under `/api/audio/files/{path}`
+- direct file downloads under `/api/audio/files/{path}`
 
 Use the live schema instead of this README for endpoint details:
 
@@ -78,9 +79,9 @@ Use the live schema instead of this README for endpoint details:
 
 ## Storage Model
 
-- Source audio is stored under the storage root.
-- Job outputs are stored as files and referenced from job records.
-- Database records track ownership and metadata; projects own both audio and jobs.
+- Source audio is stored under the storage root and represented as `audio_file` artifacts.
+- Job outputs are stored as files and recorded as derived artifacts with lineage.
+- Database records track ownership and metadata; projects own both artifacts and jobs.
 
 ## Documentation Rule
 
