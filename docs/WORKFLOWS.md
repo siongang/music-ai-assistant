@@ -10,7 +10,6 @@ This document describes the intended end-to-end flows for the current backend.
 Client uploads audio
       │
       ▼
-POST /projects/{id}/audio
 POST /projects/{id}/artifacts/source-audio
       │
       ├── save original file

@@ -41,7 +41,7 @@ class JobType:
     CHORD_ANALYSIS = "chord_analysis"
 
     # Legacy aliases kept for backward compatibility while API clients migrate.
-    MIDI_CONVERSION = MIDI_TRANSCRIPTION
+    MIDI_CONVERSION = "midi_conversion"
     MELODY_EXTRACTION = "melody_extraction"
 
 # Storage paths

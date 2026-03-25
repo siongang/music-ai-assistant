@@ -2,7 +2,7 @@
 Audio file download endpoint for job outputs.
 
 Job outputs (stems, MIDI, etc.) are downloaded by path.
-Upload and metadata are project-scoped: use POST/GET /api/projects/{project_id}/audio.
+Source uploads and artifact metadata are project-scoped under /api/projects/{project_id}/artifacts.
 """
 from fastapi import APIRouter, HTTPException, status as http_status
 from fastapi.responses import FileResponse

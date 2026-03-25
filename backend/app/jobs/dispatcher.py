@@ -81,5 +81,6 @@ class JobDispatcher:
 
     def _fail(self, job_id: UUID, error: str) -> dict:
         logger.error(f"Job {job_id} failed: {error}")
+        self.db.rollback()
         self.job_service.update_job_status(job_id, JobStatus.FAILED, error_message=error)
         return {"status": "failed", "error": error}

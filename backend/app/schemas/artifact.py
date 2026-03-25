@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ArtifactMetadataResponse(BaseModel):
@@ -11,13 +11,13 @@ class ArtifactMetadataResponse(BaseModel):
     model_provider_key: Optional[str] = None
     model_name: Optional[str] = None
     model_version: Optional[str] = None
-    model_params: dict[str, Any] = {}
+    model_params: dict[str, Any] = Field(default_factory=dict)
     processing_time_seconds: Optional[float] = None
     duration_seconds: Optional[float] = None
     sample_rate: Optional[int] = None
     channels: Optional[int] = None
     stem_name: Optional[str] = None
-    extra: dict[str, Any] = {}
+    extra: dict[str, Any] = Field(default_factory=dict)
 
 
 class ArtifactResponse(BaseModel):

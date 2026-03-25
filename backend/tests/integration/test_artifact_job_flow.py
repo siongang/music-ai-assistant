@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from app.capabilities.base import ModelMetadata
 from app.capabilities.midi import MidiTranscriptionOutput, NoteEvent
 from app.capabilities.stems import StemFile, StemSeparationOutput
@@ -61,6 +63,35 @@ class FakeMidiProvider:
         )
 
 
+class FakeMultiStemProvider:
+    provider_key = "demucs_htdemucs"
+    capability = "stem_separation"
+
+    @property
+    def is_available(self):
+        return True
+
+    def run(self, input):
+        input.output_dir.mkdir(parents=True, exist_ok=True)
+        stems = []
+        for stem_name in ("vocals", "drums"):
+            stem_path = input.output_dir / f"{input.audio_path.stem}.{stem_name}.mp3"
+            stem_path.write_bytes(stem_name.encode())
+            stems.append(StemFile(stem_name=stem_name, output_path=stem_path, confidence=0.7))
+        return StemSeparationOutput(
+            stems=stems,
+            sample_rate=44100,
+            confidence=0.7,
+            model_metadata=ModelMetadata(
+                provider_key=self.provider_key,
+                model_name="fake_demucs",
+                model_version="test",
+                params_used={},
+                processing_time_seconds=0.01,
+            ),
+        )
+
+
 def _create_project(client):
     response = client.post("/api/projects", json={"name": "Test Project"})
     assert response.status_code == 201
@@ -113,10 +144,54 @@ def test_upload_creates_source_artifact(app_client, dummy_audio_upload, monkeypa
     metadata_body = artifact_metadata.json()
     assert metadata_body["id"] == body["artifact_id"]
     assert metadata_body["storage_path"].endswith("converted.wav")
+    assert metadata_body["file_size_bytes"] == len(b"wav")
+    assert metadata_body["metadata"]["extra"]["original_file_size_bytes"] == len(b"fake-audio-content")
 
     artifact_download = client.get(f"/api/projects/{project_id}/artifacts/{body['artifact_id']}/download")
     assert artifact_download.status_code == 200
     assert artifact_download.content == b"wav"
+
+
+def test_waveform_endpoint_returns_waveform_data(app_client, dummy_audio_upload, monkeypatch):
+    client, storage_root = app_client
+
+    from app.api.endpoints import project_artifacts as project_artifacts_endpoint
+    from app.services.waveform_service import WaveformService
+
+    monkeypatch.setattr(
+        project_artifacts_endpoint.AudioConversionService,
+        "convert_audio_file",
+        _fake_convert(storage_root),
+    )
+
+    def fake_get_waveform_data(self, artifact_id, audio_path, level=512):
+        assert isinstance(artifact_id, UUID)
+        assert audio_path.exists()
+        return {
+            "artifact_id": str(artifact_id),
+            "level": level,
+            "duration": 3.2,
+            "channels": 2,
+            "peaks": [{"min": -0.25, "max": 0.5}],
+        }
+
+    monkeypatch.setattr(WaveformService, "get_waveform_data", fake_get_waveform_data)
+
+    project_id = _create_project(client)
+    upload = client.post(
+        f"/api/projects/{project_id}/artifacts/source-audio",
+        files={"file": dummy_audio_upload},
+    )
+    assert upload.status_code == 201
+    artifact_id = upload.json()["artifact_id"]
+
+    waveform = client.get(f"/api/projects/{project_id}/artifacts/{artifact_id}/waveform")
+    assert waveform.status_code == 200
+    waveform_body = waveform.json()
+    assert waveform_body["artifact_id"] == artifact_id
+    assert waveform_body["level"] == 512
+    assert waveform_body["channels"] == 2
+    assert waveform_body["peaks"] == [{"min": -0.25, "max": 0.5}]
 
 
 def test_job_flow_creates_output_artifacts(app_client, dummy_audio_upload, monkeypatch):
@@ -134,7 +209,7 @@ def test_job_flow_creates_output_artifacts(app_client, dummy_audio_upload, monke
 
     original_get = ProviderRegistry.get
 
-    def fake_get(capability, provider_key):
+    def fake_get(cls, capability, provider_key):
         if capability == "stem_separation":
             return FakeStemProvider()
         if capability == "midi_transcription":
@@ -172,6 +247,114 @@ def test_job_flow_creates_output_artifacts(app_client, dummy_audio_upload, monke
     artifact = client.get(f"/api/projects/{project_id}/artifacts/{artifact_ids[0]}")
     assert artifact.status_code == 200
     assert artifact.json()["type"] == "stem_audio"
+
+
+def test_job_creation_accepts_legacy_midi_conversion_type(app_client, dummy_audio_upload, monkeypatch):
+    client, storage_root = app_client
+
+    from app.api.endpoints import project_artifacts as project_artifacts_endpoint
+    from app.providers.registry import ProviderRegistry
+    from app.tasks import job_tasks
+
+    monkeypatch.setattr(
+        project_artifacts_endpoint.AudioConversionService,
+        "convert_audio_file",
+        _fake_convert(storage_root),
+    )
+    monkeypatch.setattr(job_tasks.process_audio_job, "delay", lambda job_id: {"job_id": job_id})
+
+    original_get = ProviderRegistry.get
+
+    def fake_get(cls, capability, provider_key):
+        if capability == "midi_transcription":
+            return FakeMidiProvider()
+        return original_get(capability, provider_key)
+
+    monkeypatch.setattr(ProviderRegistry, "get", fake_get)
+
+    project_id = _create_project(client)
+    upload = client.post(f"/api/projects/{project_id}/artifacts/source-audio", files={"file": dummy_audio_upload})
+    assert upload.status_code == 201
+    source_artifact_id = upload.json()["artifact_id"]
+
+    create_job = client.post(
+        f"/api/projects/{project_id}/jobs",
+        json={
+            "type": "midi_conversion",
+            "input": {"input_artifact_id": source_artifact_id},
+            "params": {},
+        },
+    )
+    assert create_job.status_code == 201
+    assert create_job.json()["capability"] == "midi_transcription"
+
+
+def test_failed_job_rolls_back_flushed_artifacts(app_client, dummy_audio_upload, monkeypatch):
+    client, storage_root = app_client
+
+    from app.api.endpoints import project_artifacts as project_artifacts_endpoint
+    from app.artifacts.service import ArtifactService
+    from app.providers.registry import ProviderRegistry
+    from app.tasks import job_tasks
+
+    monkeypatch.setattr(
+        project_artifacts_endpoint.AudioConversionService,
+        "convert_audio_file",
+        _fake_convert(storage_root),
+    )
+    monkeypatch.setattr(job_tasks.process_audio_job, "delay", lambda job_id: {"job_id": job_id})
+
+    original_get = ProviderRegistry.get
+
+    def fake_get(cls, capability, provider_key):
+        if capability == "stem_separation":
+            return FakeMultiStemProvider()
+        return original_get(capability, provider_key)
+
+    monkeypatch.setattr(ProviderRegistry, "get", fake_get)
+
+    original_create = ArtifactService.create
+    create_calls = {"count": 0}
+
+    def flaky_create(self, *args, **kwargs):
+        artifact = original_create(self, *args, **kwargs)
+        if kwargs.get("artifact_type").value == "stem_audio":
+            create_calls["count"] += 1
+            if create_calls["count"] == 2:
+                raise RuntimeError("simulated artifact persistence failure")
+        return artifact
+
+    monkeypatch.setattr(ArtifactService, "create", flaky_create)
+
+    project_id = _create_project(client)
+    upload = client.post(f"/api/projects/{project_id}/artifacts/source-audio", files={"file": dummy_audio_upload})
+    assert upload.status_code == 201
+    source_artifact_id = upload.json()["artifact_id"]
+
+    create_job = client.post(
+        f"/api/projects/{project_id}/jobs",
+        json={
+            "capability": "stem_separation",
+            "input": {"input_artifact_id": source_artifact_id},
+            "params": {},
+        },
+    )
+    assert create_job.status_code == 201
+    job_id = create_job.json()["job_id"]
+
+    result = job_tasks.process_audio_job.run(job_id)
+    assert result["status"] == "failed"
+
+    job = client.get(f"/api/projects/{project_id}/jobs/{job_id}")
+    assert job.status_code == 200
+    assert job.json()["status"] == "failed"
+
+    artifacts = client.get(f"/api/projects/{project_id}/artifacts")
+    assert artifacts.status_code == 200
+    artifact_items = artifacts.json()
+    assert len(artifact_items) == 1
+    assert artifact_items[0]["id"] == source_artifact_id
+
 
 def test_capability_discovery_exposes_registered_defaults(app_client):
     client, _storage_root = app_client

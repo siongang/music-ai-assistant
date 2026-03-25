@@ -6,7 +6,7 @@ Every file the system produces must be recorded as an ArtifactRecord.
 """
 from enum import Enum
 from typing import Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ArtifactType(str, Enum):
@@ -31,10 +31,11 @@ class ArtifactMetadata(BaseModel):
     model_provider_key: str | None = None
     model_name: str | None = None
     model_version: str | None = None
-    model_params: dict[str, Any] = {}
+    model_params: dict[str, Any] = Field(default_factory=dict)
     processing_time_seconds: float | None = None
     duration_seconds: float | None = None
     sample_rate: int | None = None
     channels: int | None = None
     stem_name: str | None = None      # for STEM_AUDIO type
-    extra: dict[str, Any] = {}        # extensible catch-all
+    params_hash: str | None = None    # sha256 prefix of capability+provider+params; used for reuse checks
+    extra: dict[str, Any] = Field(default_factory=dict)        # extensible catch-all

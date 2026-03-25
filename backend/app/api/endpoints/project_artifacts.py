@@ -90,8 +90,8 @@ def upload_source_audio(
             file=file.file,
             filename=sanitized_filename,
         )
-        file_size = original_path.stat().st_size
-        if not validate_file_size(file_size):
+        original_file_size = original_path.stat().st_size
+        if not validate_file_size(original_file_size):
             try:
                 original_path.unlink()
             except OSError:
@@ -102,11 +102,26 @@ def upload_source_audio(
             )
 
         original_storage_path = str(Path("audio") / str(artifact_id) / sanitized_filename)
-        conversion_result = conversion_service.convert_audio_file(
-            audio_id=artifact_id,
-            original_path=original_path,
-        )
+        try:
+            conversion_result = conversion_service.convert_audio_file(
+                audio_id=artifact_id,
+                original_path=original_path,
+            )
+        except Exception as conv_exc:
+            for path_to_remove in [
+                original_path,
+                Path(STORAGE_ROOT) / "audio" / str(artifact_id) / "converted.wav",
+            ]:
+                try:
+                    path_to_remove.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            raise HTTPException(
+                status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Could not process audio file: {conv_exc}",
+            ) from conv_exc
         converted_storage_path = conversion_result["converted_path"]
+        converted_file_size = (Path(STORAGE_ROOT) / converted_storage_path).stat().st_size
         metadata = conversion_result["metadata"]
 
         artifact = artifact_service.create(
@@ -119,12 +134,13 @@ def upload_source_audio(
                 channels=metadata.get("channels"),
                 extra={
                     "filename": sanitized_filename,
+                    "original_file_size_bytes": original_file_size,
                     "original_storage_path": original_storage_path,
                     "original_format": file_ext,
                     "converted_file_path": converted_storage_path,
                 },
             ),
-            file_size_bytes=file_size,
+            file_size_bytes=converted_file_size,
         )
         artifact_service.db.commit()
         return SourceAudioUploadResponse(
@@ -156,12 +172,13 @@ def list_project_artifacts(
     project_service: ProjectService = Depends(get_project_service),
 ):
     _ensure_project(project_service, project_id)
-    artifacts = artifact_service.list_for_project(project_id)
-    if artifact_type:
-        artifacts = [a for a in artifacts if a.type == artifact_type]
-    if parent_artifact_id:
-        artifacts = [a for a in artifacts if a.parent_artifact_id == parent_artifact_id]
-    artifacts = artifacts[offset: offset + limit]
+    artifacts = artifact_service.list_for_project_filtered(
+        project_id=project_id,
+        artifact_type=artifact_type,
+        parent_artifact_id=parent_artifact_id,
+        limit=limit,
+        offset=offset,
+    )
     return [_to_response(artifact) for artifact in artifacts]
 
 

@@ -70,12 +70,11 @@ def get_artifact_waveform(
     try:
         # Get or generate waveform data
         waveform_data = waveform_service.get_waveform_data(
-            audio_id=artifact_id,
+            artifact_id=artifact_id,
             audio_path=audio_path,
             level=level
         )
-        waveform_data["artifact_id"] = str(artifact.id)
-        
+
         return WaveformResponse(**waveform_data)
         
     except Exception as e:
